@@ -13,7 +13,7 @@ pub enum TokenType {
     Less, LessEqual,
 
     // Literals.
-    Identifier, String, Number,
+    Identifier, String(String), Number,
 
     // Keywords.
     And, Class, Else, False, Fun, For, If, Nil, Or,
@@ -36,7 +36,7 @@ impl Token {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {} {}", self.token_type, self.lexeme, self.line)
+        write!(f, "{:?} {:?} {:?}", self.token_type, self.lexeme, self.line)
     }
 }
 
@@ -96,6 +96,8 @@ impl Scanner {
             // comments and slashes
             '/' => if self.is_next('/') {self.consume_comment()}
                 else {self.add_token(TokenType::Slash)},
+            // literal values
+            '"' => self.consume_string(),
             // unknown chars
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
@@ -151,5 +153,23 @@ impl Scanner {
         while !self.is_at_end() && !self.is_next('\n') {
             self.consume_char();
         };
+    }
+    fn consume_string(&mut self) {
+        while !self.is_at_end() && !self.is_next('"') {
+            if self.is_next('\n') {
+                self.tok_line += 1;
+            }
+            self.consume_char();
+        }
+
+        if self.is_at_end() {
+            self.error("Unterminated string");
+        }
+
+        self.consume_char(); // consume closing "
+
+        // trim surrounding quotes
+        let val = self.source[self.tok_start+1..self.tok_curr-1].to_string();
+        self.add_token(TokenType::String(val));
     }
 }
