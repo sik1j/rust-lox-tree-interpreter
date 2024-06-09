@@ -72,6 +72,7 @@ impl Scanner {
     fn scan_token(&mut self) {
         let c = self.next_char();
         match c {
+            // simple single char tokens
             '(' => self.add_token(TokenType::LeftParen),
             ')' => self.add_token(TokenType::RightParen),
             '{' => self.add_token(TokenType::LeftBrace),
@@ -82,6 +83,11 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
+            // white space
+            ' ' => {},
+            '\r' => {},
+            '\t' => {},
+            '\n' => {self.tok_line += 1},
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
     }
