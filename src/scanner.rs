@@ -39,3 +39,57 @@ impl std::fmt::Display for Token {
         write!(f, "{:?} {} {}", self.token_type, self.lexeme, self.line)
     }
 }
+
+pub struct Scanner {
+    source: String, // source code
+    tokens: Vec<Token>,
+
+    tok_start: usize,
+    tok_curr: usize,
+    tok_line: usize,
+}
+
+impl Scanner {
+    pub fn new(source: String) -> Self {
+        Scanner {source, tokens: vec![], tok_start: 0, tok_curr: 0, tok_line: 1}
+    }
+
+    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+        while !self.is_at_end() {
+            self.tok_start = self.tok_curr;
+            self.scan_token();
+        }
+
+        self.tokens.push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
+        &self.tokens
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.tok_curr >= self.source.len()
+    }
+    fn scan_token(&mut self) {
+        let c = self.next_char();
+        match c {
+            '(' => self.add_token(TokenType::LeftParen),
+            ')' => self.add_token(TokenType::RightParen),
+            '{' => self.add_token(TokenType::LeftBrace),
+            '}' => self.add_token(TokenType::RightBrace),
+            ',' => self.add_token(TokenType::Comma),
+            '.' => self.add_token(TokenType::Dot),
+            '-' => self.add_token(TokenType::Minus),
+            '+' => self.add_token(TokenType::Plus),
+            ';' => self.add_token(TokenType::Semicolon),
+            '*' => self.add_token(TokenType::Star),
+            _ => panic!("Could not recognize char: {:?}", c),
+        }
+    }
+    fn next_char(&mut self) -> char {
+        let next = self.source.as_bytes()[self.tok_curr];
+        self.tok_curr += 1;
+        next as char
+    }
+    fn add_token(&mut self, token_type: TokenType) {
+        let text = &self.source[self.tok_start..self.tok_curr];
+        self.tokens.push(Token::new(token_type, text.to_string(), self.tok_line));
+    }
+}
