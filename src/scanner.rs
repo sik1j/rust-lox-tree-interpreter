@@ -72,7 +72,7 @@ impl Scanner {
     fn scan_token(&mut self) {
         let c = self.next_char();
         match c {
-            // simple single char tokens
+            // 1 char tokens
             '(' => self.add_token(TokenType::LeftParen),
             ')' => self.add_token(TokenType::RightParen),
             '{' => self.add_token(TokenType::LeftBrace),
@@ -83,6 +83,11 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
+            // 1-2 char tokens
+            '!' => self.check_next_and_add('=', TokenType::Bang, TokenType::BangEqual),
+            '=' => self.check_next_and_add('=', TokenType::Equal, TokenType::EqualEqual),
+            '<' => self.check_next_and_add('=', TokenType::Less, TokenType::LessEqual),
+            '>' => self.check_next_and_add('=', TokenType::Greater, TokenType::GreaterEqual),
             // white space
             ' ' => {},
             '\r' => {},
@@ -91,8 +96,11 @@ impl Scanner {
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
     }
+    fn char_at(&self, ind: usize) -> char {
+        self.source.as_bytes()[ind] as char
+    }
     fn next_char(&mut self) -> char {
-        let next = self.source.as_bytes()[self.tok_curr];
+        let next = self.char_at(self.tok_curr);
         self.tok_curr += 1;
         next as char
     }
@@ -107,5 +115,31 @@ impl Scanner {
     fn report(&mut self, wher: &str, message: &str) {
         eprintln!("[line {}] Error{}: {}", self.tok_line, wher, message);
         self.had_error = true;
+    }
+    fn is_next(&self, c: char) -> bool {
+        !self.is_at_end() && self.char_at(self.tok_curr) == c
+    }
+    /// If the next char matches `check`, then adds `two_char` token, else `one_char` token.
+    /// also consumes char in source if necessary
+    /// # Arguments
+    ///
+    /// * `check`: The second char of the two char token to check against
+    /// * `one_char`:
+    /// * `two_char`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn check_next_and_add(&mut self, check: char, one_char: TokenType, two_char: TokenType) {
+        if self.is_next(check) {
+            self.tok_curr += 1;
+            self.add_token(two_char);
+        } else {
+            self.add_token(one_char);
+        }
     }
 }
