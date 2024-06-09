@@ -70,7 +70,7 @@ impl Scanner {
         self.tok_curr >= self.source.len()
     }
     fn scan_token(&mut self) {
-        let c = self.next_char();
+        let c = self.consume_char();
         match c {
             // 1 char tokens
             '(' => self.add_token(TokenType::LeftParen),
@@ -93,16 +93,20 @@ impl Scanner {
             '\r' => {},
             '\t' => {},
             '\n' => {self.tok_line += 1},
+            // comments and slashes
+            '/' => if self.is_next('/') {self.consume_comment()}
+                else {self.add_token(TokenType::Slash)},
+            // unknown chars
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
     }
     fn char_at(&self, ind: usize) -> char {
         self.source.as_bytes()[ind] as char
     }
-    fn next_char(&mut self) -> char {
+    fn consume_char(&mut self) -> char {
         let next = self.char_at(self.tok_curr);
         self.tok_curr += 1;
-        next as char
+        next
     }
     fn add_token(&mut self, token_type: TokenType) {
         let text = &self.source[self.tok_start..self.tok_curr];
@@ -141,5 +145,11 @@ impl Scanner {
         } else {
             self.add_token(one_char);
         }
+    }
+
+    fn consume_comment(&mut self) {
+        while !self.is_at_end() && !self.is_next('\n') {
+            self.consume_char();
+        };
     }
 }
