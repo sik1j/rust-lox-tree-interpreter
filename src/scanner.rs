@@ -47,11 +47,13 @@ pub struct Scanner {
     tok_start: usize,
     tok_curr: usize,
     tok_line: usize,
+
+    had_error: bool,
 }
 
 impl Scanner {
     pub fn new(source: String) -> Self {
-        Scanner {source, tokens: vec![], tok_start: 0, tok_curr: 0, tok_line: 1}
+        Scanner {source, tokens: vec![], tok_start: 0, tok_curr: 0, tok_line: 1, had_error: false}
     }
 
     pub fn scan_tokens(&mut self) -> &Vec<Token> {
@@ -80,7 +82,7 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
-            _ => panic!("Could not recognize char: {:?}", c),
+            _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
     }
     fn next_char(&mut self) -> char {
@@ -91,5 +93,13 @@ impl Scanner {
     fn add_token(&mut self, token_type: TokenType) {
         let text = &self.source[self.tok_start..self.tok_curr];
         self.tokens.push(Token::new(token_type, text.to_string(), self.tok_line));
+    }
+    fn error(&mut self, message: &str) {
+        self.report("", message);
+    }
+
+    fn report(&mut self, wher: &str, message: &str) {
+        eprintln!("[line {}] Error{}: {}", self.tok_line, wher, message);
+        self.had_error = true;
     }
 }
