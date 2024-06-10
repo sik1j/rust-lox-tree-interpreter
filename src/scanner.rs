@@ -1,4 +1,5 @@
 use std::fmt::{Formatter};
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum TokenType {
@@ -13,7 +14,7 @@ pub enum TokenType {
     Less, LessEqual,
 
     // Literals.
-    Identifier, String(String), Number,
+    Identifier, String(String), Number(f64),
 
     // Keywords.
     And, Class, Else, False, Fun, For, If, Nil, Or,
@@ -98,6 +99,7 @@ impl Scanner {
                 else {self.add_token(TokenType::Slash)},
             // literal values
             '"' => self.consume_string(),
+            '0'..='9' => self.consume_number(),
             // unknown chars
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
@@ -124,6 +126,22 @@ impl Scanner {
     }
     fn is_next(&self, c: char) -> bool {
         !self.is_at_end() && self.char_at(self.tok_curr) == c
+    }
+
+    fn peek(&self) -> char {
+        if !self.is_at_end() {
+            self.char_at(self.tok_curr)
+        } else {
+            '\0'
+        }
+    }
+
+    fn peek_next(&self) -> char {
+        if self.tok_curr + 1 < self.source.len() {
+            self.char_at(self.tok_curr + 1)
+        } else {
+            '\0'
+        }
     }
     /// If the next char matches `check`, then adds `two_char` token, else `one_char` token.
     /// also consumes char in source if necessary
@@ -171,5 +189,22 @@ impl Scanner {
         // trim surrounding quotes
         let val = self.source[self.tok_start+1..self.tok_curr-1].to_string();
         self.add_token(TokenType::String(val));
+    }
+    fn consume_number(&mut self) {
+        while self.peek().is_digit(10) { // pre decimal
+            self.consume_char();
+        }
+
+        if self.is_next('.') && self.peek_next().is_digit(10) { // trailing dots not allowed
+            self.consume_char();
+        }
+
+        while self.peek().is_digit(10) { // post decimal
+            self.consume_char();
+        }
+
+        let num_str = &self.source[self.tok_start..self.tok_curr];
+        let num =f64::from_str(num_str).expect("Expected a number");
+        self.add_token(TokenType::Number(num));
     }
 }
