@@ -1,26 +1,55 @@
-use std::fmt::{Formatter};
+use std::fmt::Formatter;
 use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum TokenType {
     // Single-character tokens.
-    LeftParen, RightParen, LeftBrace, RightBrace,
-    Comma, Dot, Minus, Plus, Semicolon, Slash, Star,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
 
     // One or two character tokens.
-    Bang, BangEqual,
-    Equal, EqualEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
 
     // Literals.
-    Identifier, String(String), Number(f64),
+    Identifier,
+    String(String),
+    Number(f64),
 
     // Keywords.
-    And, Class, Else, False, Fun, For, If, Nil, Or,
-    Print, Return, Super, This, True, Var, While,
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 
-    Eof
+    Eof,
 }
 
 pub struct Token {
@@ -31,7 +60,11 @@ pub struct Token {
 
 impl Token {
     pub fn new(token_type: TokenType, lexeme: String, line: usize) -> Self {
-        Token {token_type, lexeme, line}
+        Token {
+            token_type,
+            lexeme,
+            line,
+        }
     }
 }
 
@@ -54,7 +87,14 @@ pub struct Scanner {
 
 impl Scanner {
     pub fn new(source: String) -> Self {
-        Scanner {source, tokens: vec![], tok_start: 0, tok_curr: 0, tok_line: 1, had_error: false}
+        Scanner {
+            source,
+            tokens: vec![],
+            tok_start: 0,
+            tok_curr: 0,
+            tok_line: 1,
+            had_error: false,
+        }
     }
 
     pub fn scan_tokens(&mut self) -> &Vec<Token> {
@@ -63,7 +103,8 @@ impl Scanner {
             self.scan_token();
         }
 
-        self.tokens.push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
+        self.tokens
+            .push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
         &self.tokens
     }
 
@@ -90,20 +131,25 @@ impl Scanner {
             '<' => self.check_next_and_add('=', TokenType::Less, TokenType::LessEqual),
             '>' => self.check_next_and_add('=', TokenType::Greater, TokenType::GreaterEqual),
             // white space
-            ' ' => {},
-            '\r' => {},
-            '\t' => {},
-            '\n' => {self.tok_line += 1},
+            ' ' => {}
+            '\r' => {}
+            '\t' => {}
+            '\n' => self.tok_line += 1,
             // comments and slashes
-            '/' => if self.is_next('/') {self.consume_comment()}
-                else {self.add_token(TokenType::Slash)},
+            '/' => {
+                if self.is_next('/') {
+                    self.consume_comment()
+                } else {
+                    self.add_token(TokenType::Slash)
+                }
+            }
             // literal values
             '"' => self.consume_string(),
             '0'..='9' => self.consume_number(),
             // identifiers
             v if v.is_ascii_alphabetic() || v == '_' => self.consume_identifier(),
             // unknown chars
-            _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
+            _ => self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
     }
     fn char_at(&self, ind: usize) -> char {
@@ -116,7 +162,8 @@ impl Scanner {
     }
     fn add_token(&mut self, token_type: TokenType) {
         let text = &self.source[self.tok_start..self.tok_curr];
-        self.tokens.push(Token::new(token_type, text.to_string(), self.tok_line));
+        self.tokens
+            .push(Token::new(token_type, text.to_string(), self.tok_line));
     }
     fn error(&mut self, message: &str) {
         self.report("", message);
@@ -172,7 +219,7 @@ impl Scanner {
     fn consume_comment(&mut self) {
         while !self.is_at_end() && !self.is_next('\n') {
             self.consume_char();
-        };
+        }
     }
     fn consume_string(&mut self) {
         while !self.is_at_end() && !self.is_next('"') {
@@ -189,24 +236,27 @@ impl Scanner {
         self.consume_char(); // consume closing "
 
         // trim surrounding quotes
-        let val = self.source[self.tok_start+1..self.tok_curr-1].to_string();
+        let val = self.source[self.tok_start + 1..self.tok_curr - 1].to_string();
         self.add_token(TokenType::String(val));
     }
     fn consume_number(&mut self) {
-        while self.peek().is_ascii_digit() { // pre decimal
+        // pre decimal
+        while self.peek().is_ascii_digit() {
             self.consume_char();
         }
 
-        if self.is_next('.') && self.peek_next().is_ascii_digit() { // trailing dots not allowed
+        // trailing dots not allowed
+        if self.is_next('.') && self.peek_next().is_ascii_digit() {
             self.consume_char();
         }
 
-        while self.peek().is_ascii_digit() { // post decimal
+        // post decimal
+        while self.peek().is_ascii_digit() {
             self.consume_char();
         }
 
         let num_str = &self.source[self.tok_start..self.tok_curr];
-        let num =f64::from_str(num_str).expect("Expected a number");
+        let num = f64::from_str(num_str).expect("Expected a number");
         self.add_token(TokenType::Number(num));
     }
     fn consume_identifier(&mut self) {
@@ -221,23 +271,23 @@ impl Scanner {
 
     fn get_keyword(identifier: &str) -> Option<TokenType> {
         Some(match identifier {
-            "and" =>    TokenType::And,
-            "class" =>  TokenType::Class,
-            "else" =>   TokenType::Else,
-            "false" =>  TokenType::False,
-            "for" =>    TokenType::For,
-            "fun" =>    TokenType::Fun,
-            "if" =>     TokenType::If,
-            "nil" =>    TokenType::Nil,
-            "or" =>     TokenType::Or,
-            "print" =>  TokenType::Print,
+            "and" => TokenType::And,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "fun" => TokenType::Fun,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
             "return" => TokenType::Return,
-            "super" =>  TokenType::Super,
-            "this" =>   TokenType::This,
-            "true" =>   TokenType::True,
-            "var" =>    TokenType::Var,
-            "while" =>  TokenType::While,
-            _ => return None
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            _ => return None,
         })
     }
 }
