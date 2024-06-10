@@ -100,6 +100,8 @@ impl Scanner {
             // literal values
             '"' => self.consume_string(),
             '0'..='9' => self.consume_number(),
+            // identifiers
+            v if v.is_ascii_alphabetic() || v == '_' => self.consume_identifier(),
             // unknown chars
             _=> self.error(format!("Unexpected char: {:?}", c).as_str()),
         }
@@ -191,20 +193,51 @@ impl Scanner {
         self.add_token(TokenType::String(val));
     }
     fn consume_number(&mut self) {
-        while self.peek().is_digit(10) { // pre decimal
+        while self.peek().is_ascii_digit() { // pre decimal
             self.consume_char();
         }
 
-        if self.is_next('.') && self.peek_next().is_digit(10) { // trailing dots not allowed
+        if self.is_next('.') && self.peek_next().is_ascii_digit() { // trailing dots not allowed
             self.consume_char();
         }
 
-        while self.peek().is_digit(10) { // post decimal
+        while self.peek().is_ascii_digit() { // post decimal
             self.consume_char();
         }
 
         let num_str = &self.source[self.tok_start..self.tok_curr];
         let num =f64::from_str(num_str).expect("Expected a number");
         self.add_token(TokenType::Number(num));
+    }
+    fn consume_identifier(&mut self) {
+        while self.is_next('_') || self.peek().is_ascii_alphanumeric() {
+            self.consume_char();
+        }
+
+        let iden_or_keyword = &self.source[self.tok_start..self.tok_curr];
+        let tok_type = Self::get_keyword(iden_or_keyword).unwrap_or(TokenType::Identifier);
+        self.add_token(tok_type);
+    }
+
+    fn get_keyword(identifier: &str) -> Option<TokenType> {
+        Some(match identifier {
+            "and" =>    TokenType::And,
+            "class" =>  TokenType::Class,
+            "else" =>   TokenType::Else,
+            "false" =>  TokenType::False,
+            "for" =>    TokenType::For,
+            "fun" =>    TokenType::Fun,
+            "if" =>     TokenType::If,
+            "nil" =>    TokenType::Nil,
+            "or" =>     TokenType::Or,
+            "print" =>  TokenType::Print,
+            "return" => TokenType::Return,
+            "super" =>  TokenType::Super,
+            "this" =>   TokenType::This,
+            "true" =>   TokenType::True,
+            "var" =>    TokenType::Var,
+            "while" =>  TokenType::While,
+            _ => return None
+        })
     }
 }
