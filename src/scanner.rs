@@ -82,7 +82,7 @@ pub struct Scanner {
     tok_curr: usize,
     tok_line: usize,
 
-    had_error: bool,
+    pub had_error: bool,
 }
 
 impl Scanner {

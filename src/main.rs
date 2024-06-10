@@ -1,3 +1,8 @@
+mod driver;
+mod scanner;
+
+use driver::Driver;
 fn main() {
-    println!("Hello, world!");
+    let mut d = Driver::new();
+    d.main_loop();
 }
