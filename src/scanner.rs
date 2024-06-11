@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -52,10 +52,11 @@ pub enum TokenType {
     Eof,
 }
 
+#[derive(Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    line: usize,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub line: usize,
 }
 
 impl Token {
@@ -97,7 +98,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Vec<Token> {
         while !self.is_at_end() {
             self.tok_start = self.tok_curr;
             self.scan_token();
@@ -105,7 +106,7 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
-        &self.tokens
+        std::mem::take(&mut self.tokens)
     }
 
     fn is_at_end(&self) -> bool {

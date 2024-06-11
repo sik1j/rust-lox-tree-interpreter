@@ -1,4 +1,5 @@
 mod driver;
+mod parser;
 mod scanner;
 
 use driver::Driver;

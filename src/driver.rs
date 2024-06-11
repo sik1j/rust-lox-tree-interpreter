@@ -1,6 +1,7 @@
 use crate::scanner::Scanner;
 use std::io::{BufRead, Write};
 use std::{env, fs};
+use crate::parser::Parser;
 
 pub struct Driver {}
 
@@ -44,9 +45,8 @@ impl Driver {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens();
 
-        for token in tokens {
-            println!("{token}");
-        }
+        let mut parser = Parser::new(tokens);
+        dbg!(parser.expression());
 
         scanner.had_error
     }
