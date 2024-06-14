@@ -1,6 +1,13 @@
 use std::fmt::Formatter;
 use std::str::FromStr;
 
+#[derive(Debug)]
+pub struct Error {
+    pub msg: String,
+    pub line: usize,
+    pub wher: String,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
@@ -83,7 +90,7 @@ pub struct Scanner {
     tok_curr: usize,
     tok_line: usize,
 
-    pub had_error: bool,
+    errors: Vec<Error>,
 }
 
 impl Scanner {
@@ -94,11 +101,11 @@ impl Scanner {
             tok_start: 0,
             tok_curr: 0,
             tok_line: 1,
-            had_error: false,
+            errors: vec![],
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> (Vec<Token>, Vec<Error>) {
         while !self.is_at_end() {
             self.tok_start = self.tok_curr;
             self.scan_token();
@@ -106,7 +113,7 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
-        std::mem::take(&mut self.tokens)
+        (std::mem::take(&mut self.tokens), std::mem::take(&mut self.errors))
     }
 
     fn is_at_end(&self) -> bool {
@@ -150,7 +157,7 @@ impl Scanner {
             // identifiers
             v if v.is_ascii_alphabetic() || v == '_' => self.consume_identifier(),
             // unknown chars
-            _ => self.error(format!("Unexpected char: {:?}", c).as_str()),
+            _ => self.error(&format!("Unexpected char: {:?}", c)),
         }
     }
     fn char_at(&self, ind: usize) -> char {
@@ -171,8 +178,11 @@ impl Scanner {
     }
 
     fn report(&mut self, wher: &str, message: &str) {
-        eprintln!("[line {}] Error{}: {}", self.tok_line, wher, message);
-        self.had_error = true;
+        self.errors.push(Error {
+            msg: message.to_string(),
+            wher: wher.to_string(),
+            line: self.tok_line,
+        });
     }
     fn is_next(&self, c: char) -> bool {
         !self.is_at_end() && self.char_at(self.tok_curr) == c
@@ -232,6 +242,7 @@ impl Scanner {
 
         if self.is_at_end() {
             self.error("Unterminated string");
+            return;
         }
 
         self.consume_char(); // consume closing "
@@ -257,7 +268,13 @@ impl Scanner {
         }
 
         let num_str = &self.source[self.tok_start..self.tok_curr];
-        let num = f64::from_str(num_str).expect("Expected a number");
+        let num = match f64::from_str(num_str) {
+            Ok(n) => n,
+            Err(_) => return {
+                self.error(&format!("Could not parse number: {}", num_str));
+            },
+        };
+
         self.add_token(TokenType::Number(num));
     }
     fn consume_identifier(&mut self) {
