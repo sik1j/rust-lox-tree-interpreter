@@ -28,7 +28,9 @@ pub enum Expression {
     // Literals
     Number(f64),
     String(String),
-    True, False, Nil,
+    True,
+    False,
+    Nil,
 }
 use Expression as Expr;
 use TokenType as Type;
@@ -115,7 +117,20 @@ impl Parser {
     }
 
     fn factor(&mut self) -> Expr {
-        self.binary_parser(Self::primary, &[Type::Star, Type::Slash])
+        self.binary_parser(Self::unary, &[Type::Star, Type::Slash])
+    }
+
+    fn unary(&mut self) -> Expr {
+        if self.is_next(&[TokenType::Bang, TokenType::Minus]) {
+            let op = self.consume_token();
+            let rhs = self.unary();
+
+            return Expr::Unary {
+                operator: op,
+                operand: Box::from(rhs),
+            };
+        }
+        self.primary()
     }
 
     pub fn primary(&mut self) -> Expr {
@@ -128,12 +143,18 @@ impl Parser {
             Type::Nil => Expr::Nil,
             Type::LeftParen => {
                 let expr = self.expression();
-                if self.consume_token().token_type != TokenType::RightParen {
-                    panic!("Expected a closing ')'")
-                }
+                self.try_consume(TokenType::RightParen).expect("Expected a closing ')'");
                 expr
             }
-            _ => panic!("Unexpected token: {:?}", tok)
+            _ => panic!("Unexpected token: {:?}", tok),
+        }
+    }
+
+    fn try_consume(&mut self, expected: TokenType) -> Option<Token> {
+        if self.is_next(&[expected]) {
+            Some(self.consume_token())
+        } else {
+            None
         }
     }
 }
