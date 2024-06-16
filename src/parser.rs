@@ -49,6 +49,10 @@ impl Parser {
         }
     }
 
+    pub fn parse(&mut self) -> Expr {
+        self.expression()
+    }
+
     fn consume_token(&mut self) -> Token {
         let res = self.tokens.pop().expect("Expected non-empty array");
         self.position += 1;
@@ -72,7 +76,7 @@ impl Parser {
         self.next_token().token_type == Type::Eof
     }
 
-    pub fn expression(&mut self) -> Expr {
+    fn expression(&mut self) -> Expr {
         self.equality()
     }
 
@@ -133,7 +137,7 @@ impl Parser {
         self.primary()
     }
 
-    pub fn primary(&mut self) -> Expr {
+    fn primary(&mut self) -> Expr {
         let tok = self.consume_token();
         match tok.token_type {
             Type::Number(num) => Expr::Number(num),
@@ -143,14 +147,14 @@ impl Parser {
             Type::Nil => Expr::Nil,
             Type::LeftParen => {
                 let expr = self.expression();
-                self.try_consume(TokenType::RightParen).expect("Expected a closing ')'");
+                self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
                 expr
             }
             _ => panic!("Unexpected token: {:?}", tok),
         }
     }
 
-    fn try_consume(&mut self, expected: TokenType) -> Option<Token> {
+    fn expect_token(&mut self, expected: TokenType) -> Option<Token> {
         if self.is_next(&[expected]) {
             Some(self.consume_token())
         } else {

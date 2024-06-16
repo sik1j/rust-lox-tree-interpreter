@@ -43,11 +43,16 @@ impl Driver {
 
     fn run(&mut self, source: String) -> bool {
         let mut scanner = Scanner::new(source);
-        let tokens = scanner.scan_tokens();
+        let (tokens, errors) = scanner.scan_tokens();
 
-        let mut parser = Parser::new(tokens);
-        dbg!(parser.expression());
+        if !errors.is_empty() {
+            return false
+        }
 
-        scanner.had_error
+        let mut parser;
+        parser = Parser::new(tokens);
+        dbg!(parser.parse());
+
+        true
     }
 }
