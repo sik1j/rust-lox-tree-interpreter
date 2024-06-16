@@ -1,76 +1,78 @@
 use crate::parser::Expression;
-use Expression as Expr;
 use crate::scanner::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn evaluate(expr: Expr) -> Expr {
+    pub fn interpret(expr: Expression) -> Result<Expression, String> {
+        Self::evaluate(expr)
+    }
+    fn evaluate(expr: Expression) -> Result<Expression, String> {
         match expr {
-            Expr::Binary { left, operator, right } => Self::eval_binary(*left, operator, *right),
-            Expr::Unary { operator, operand } => Self::eval_unary(operator, *operand),
-            Expr::Grouping(expr) => Self::evaluate(*expr),
-            _ => expr
+            Expression::Binary { left, operator, right } => Self::eval_binary(*left, operator, *right),
+            Expression::Unary { operator, operand } => Self::eval_unary(operator, *operand),
+            Expression::Grouping(expr) => Self::evaluate(*expr),
+            _ => Ok(expr)
         }
     }
 
-    fn eval_binary(lhs: Expression, op: Token, rhs: Expression) -> Expression {
-        let lhs = Self::evaluate(lhs);
-        let rhs = Self::evaluate(rhs);
+    fn eval_binary(lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
+        let lhs = Self::evaluate(lhs)?;
+        let rhs = Self::evaluate(rhs)?;
 
-        match &op.token_type {
-            TokenType::EqualEqual => Expr::Bool(Self::is_equal(&lhs, &rhs)),
-            TokenType::BangEqual => Expr::Bool(!Self::is_equal(&lhs, &rhs)),
+        Ok(match &op.token_type {
+            TokenType::EqualEqual => Expression::Bool(Self::is_equal(&lhs, &rhs)),
+            TokenType::BangEqual => Expression::Bool(!Self::is_equal(&lhs, &rhs)),
             _ =>
             match (&lhs, &rhs) {
-                (Expr::Number(lhs), Expr::Number(rhs)) => match &op.token_type {
-                    TokenType::Plus => Expr::Number(lhs + rhs),
-                    TokenType::Minus => Expr::Number(lhs - rhs),
-                    TokenType::Star => Expr::Number(lhs * rhs),
-                    TokenType::Slash => Expr::Number(lhs / rhs),
-                    TokenType::Greater => Expr::Bool(lhs > rhs),
-                    TokenType::GreaterEqual => Expr::Bool(lhs >= rhs),
-                    TokenType::Less => Expr::Bool(lhs < rhs),
-                    TokenType::LessEqual => Expr::Bool(lhs <= rhs),
-                    _ => panic!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs)
+                (Expression::Number(lhs), Expression::Number(rhs)) => match &op.token_type {
+                    TokenType::Plus => Expression::Number(lhs + rhs),
+                    TokenType::Minus => Expression::Number(lhs - rhs),
+                    TokenType::Star => Expression::Number(lhs * rhs),
+                    TokenType::Slash => Expression::Number(lhs / rhs),
+                    TokenType::Greater => Expression::Bool(lhs > rhs),
+                    TokenType::GreaterEqual => Expression::Bool(lhs >= rhs),
+                    TokenType::Less => Expression::Bool(lhs < rhs),
+                    TokenType::LessEqual => Expression::Bool(lhs <= rhs),
+                    _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs))
                 },
-                (Expr::String(lhs), Expr::String(rhs)) => Expr::String(match &op.token_type {
+                (Expression::String(lhs), Expression::String(rhs)) => Expression::String(match &op.token_type {
                     TokenType::Plus => format!("{}{}", lhs, rhs),
-                    _ => panic!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs),
+                    _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs))
                 }),
-                _ => panic!("Cannot perform '{:?} {} {:?}'", lhs, op.lexeme, rhs),
+                _ => return Err(format!("Cannot perform '{:?} {} {:?}'", lhs, op.lexeme, rhs))
             }
-        }
+        })
 
     }
 
-    fn eval_unary(operator: Token, operand: Expr) -> Expr {
-        let rhs = Self::evaluate(operand);
+    fn eval_unary(operator: Token, operand: Expression) -> Result<Expression, String> {
+        let rhs = Self::evaluate(operand)?;
 
-        match operator.token_type {
+        Ok(match operator.token_type {
             TokenType::Minus => match &rhs {
-                Expr::Number(n) => Expression::Number(-n),
-                _ => panic!("Cannot apply '-' to {:?}", rhs)
+                Expression::Number(n) => Expression::Number(-n),
+                _ => return Err(format!("Cannot apply '-' to {:?}", rhs))
             },
-            TokenType::Bang => Expr::Bool(!Self::is_truthy(&rhs)),
-            _ => panic!("Cannot apply '-' to {:?}", rhs)
-        }
+            TokenType::Bang => Expression::Bool(!Self::is_truthy(&rhs)),
+            _ => return Err(format!("Cannot apply '-' to {:?}", rhs))
+        })
     }
 
-    fn is_truthy(expr: &Expr) -> bool {
+    fn is_truthy(expr: &Expression) -> bool {
         match expr {
-            &Expr::Bool(b) => b,
-            Expr::Nil => false,
+            &Expression::Bool(b) => b,
+            Expression::Nil => false,
             _ => true,
         }
     }
     fn is_equal(e1: &Expression, e2: &Expression) -> bool {
         match (e1, e2) {
-            (Expr::Number(n), Expr::Number(m)) => n == m,
-            (Expr::String(n), Expr::String(m)) => n == m,
-            (Expr::Bool(n), Expr::Bool(m)) => n == m,
-            (Expr::Nil, Expr::Nil) => true,
+            (Expression::Number(n), Expression::Number(m)) => n == m,
+            (Expression::String(n), Expression::String(m)) => n == m,
+            (Expression::Bool(n), Expression::Bool(m)) => n == m,
+            (Expression::Nil, Expression::Nil) => true,
             _ => false,
         }
     }

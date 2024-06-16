@@ -1,3 +1,5 @@
+// TODO: implement error handling that does not panic
+
 use crate::scanner::{Token, TokenType};
 
 /// Grammar rules for lox:

@@ -2,10 +2,11 @@ use crate::scanner::Scanner;
 use std::io::{BufRead, Write};
 use std::{env, fs};
 use crate::interpreter::Interpreter;
-use crate::parser::Parser;
+use crate::parser::{Expression, Parser};
 
 pub struct Driver {}
 
+type ExitCode = i32;
 impl Driver {
     pub fn new() -> Self {
         Self {}
@@ -22,10 +23,10 @@ impl Driver {
     }
     pub fn run_file(&mut self, file_path: &str) {
         let source = fs::read_to_string(file_path).expect("Could not open file");
-        let had_error = self.run(source);
+        let exit_type = self.run(source);
 
-        if had_error {
-            std::process::exit(65);
+        if exit_type != 0 {
+            std::process::exit(exit_type);
         }
     }
 
@@ -42,20 +43,26 @@ impl Driver {
         }
     }
 
-    fn run(&mut self, source: String) -> bool {
+    fn run(&mut self, source: String) -> ExitCode {
         let mut scanner = Scanner::new(source);
         let (tokens, errors) = scanner.scan_tokens();
 
         if !errors.is_empty() {
-            return false
+            for error in errors {
+                println!("{:?}", error);
+            }
+            return 65
         }
 
         let mut parser;
         parser = Parser::new(tokens);
         let expr = parser.parse();
 
-        dbg!(Interpreter::evaluate(expr));
+        match Interpreter::interpret(expr) {
+            Ok(expr) => println!("{:?}", expr),
+            Err(err) => {println!("{}", err); return 70}
+        }
 
-        true
+        0
     }
 }
