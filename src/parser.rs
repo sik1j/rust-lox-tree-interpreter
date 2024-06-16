@@ -25,11 +25,11 @@ pub enum Expression {
         operator: Token,
         operand: Box<Expression>,
     },
+    Grouping(Box<Expression>),
     // Literals
     Number(f64),
     String(String),
-    True,
-    False,
+    Bool(bool),
     Nil,
 }
 use Expression as Expr;
@@ -142,13 +142,13 @@ impl Parser {
         match tok.token_type {
             Type::Number(num) => Expr::Number(num),
             Type::String(str) => Expr::String(str),
-            Type::True => Expr::True,
-            Type::False => Expr::False,
+            Type::True => Expr::Bool(true),
+            Type::False => Expr::Bool(false),
             Type::Nil => Expr::Nil,
             Type::LeftParen => {
                 let expr = self.expression();
                 self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
-                expr
+                Expr::Grouping(Box::from(expr))
             }
             _ => panic!("Unexpected token: {:?}", tok),
         }
