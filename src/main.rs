@@ -1,6 +1,7 @@
 mod driver;
 mod parser;
 mod scanner;
+mod interpreter;
 
 use driver::Driver;
 fn main() {
