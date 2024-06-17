@@ -3,13 +3,20 @@
 use crate::scanner::{Token, TokenType};
 
 /// Grammar rules for lox:
-/// expression -> equality ;
-/// equality   -> comparison (("==" | "!=") comparison)* ;
-/// comparison -> term (( ">" | ">=" | "<" | "<=" ) term)* ;
-/// term       -> factor (( "-" | "+" ) factor )* ;
-/// factor     -> unary (( "/" | "*" ) unary )* ;
-/// unary      -> ( "!" | "-" ) unary | primary ;
-/// primary    -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+/// expression   -> equality ;
+/// equality     -> comparison (("==" | "!=") comparison)* ;
+/// comparison   -> term (( ">" | ">=" | "<" | "<=" ) term)* ;
+/// term         -> factor (( "-" | "+" ) factor )* ;
+/// factor       -> unary (( "/" | "*" ) unary )* ;
+/// unary        -> ( "!" | "-" ) unary | primary ;
+/// primary      -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+///
+/// program      -> declaration* EOF ;
+/// declaration  -> varDecl | statement ;
+/// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
+/// statement    -> exprStmt | printStmt ;
+/// exprStmt     -> expression ';' ;
+/// printStmt    -> "print" expression ';' ;
 
 /// Types are not 1 to 1 with the grammar; deeply nested enums are impractical
 pub enum ASTNode {
@@ -20,6 +27,7 @@ pub enum ASTNode {
 pub enum Statement {
     Print(Expression),
     Expression(Expression),
+    VarDecl(Token, Option<Expression>)
 }
 
 #[derive(Debug)]
@@ -38,6 +46,7 @@ pub enum Expression {
     Number(f64),
     String(String),
     Bool(bool),
+    Variable(Token),
     Nil,
 }
 use Expression as Expr;
@@ -60,7 +69,7 @@ impl Parser {
     pub fn parse(&mut self) -> Vec<Statement> {
         let mut statements: Vec<Statement> = vec![];
         while !self.is_at_end() {
-            statements.push(self.statement());
+            statements.push(self.declaration());
         }
         statements
     }
@@ -162,6 +171,7 @@ impl Parser {
                 self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
                 Expr::Grouping(Box::from(expr))
             }
+            Type::Identifier => Expr::Variable(tok),
             _ => panic!("Unexpected token: {:?}", tok),
         }
     }
@@ -194,5 +204,25 @@ impl Parser {
         let expr = self.expression();
         self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
         Statement::Expression(expr)
+    }
+    fn declaration(&mut self) -> Statement {
+        if self.is_next(&[TokenType::Var]) {
+            self.consume_token();
+            self.var_declaration()
+        } else {
+            self.statement()
+        }
+    }
+    fn var_declaration(&mut self) -> Statement {
+        let iden = self.expect_token(TokenType::Identifier).expect("Expected an identifier");
+
+        let mut initalizer = None;
+        if self.is_next(&[TokenType::Equal]) {
+            self.consume_token();
+            initalizer = Some(self.expression());
+        }
+
+        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        Statement::VarDecl(iden, initalizer)
     }
 }
