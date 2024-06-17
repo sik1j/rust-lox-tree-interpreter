@@ -56,12 +56,10 @@ impl Driver {
 
         let mut parser;
         parser = Parser::new(tokens);
-        let expr = parser.parse();
+        let statements = parser.parse();
 
-        match Interpreter::interpret(expr) {
-            Ok(expr) => println!("{:?}", expr),
-            Err(err) => {println!("{}", err); return 70}
-        }
+        Interpreter::interpret(statements);
+
 
         0
     }

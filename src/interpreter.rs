@@ -1,12 +1,17 @@
 use crate::parser::Expression;
+use crate::parser::Statement;
 use crate::scanner::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn interpret(expr: Expression) -> Result<Expression, String> {
-        Self::evaluate(expr)
+    pub fn interpret(statements: Vec<Statement>) {
+        for statement in statements {
+            if let Err(msg) = Self::execute(statement) {
+                println!("{}", msg);
+            }
+        }
     }
     fn evaluate(expr: Expression) -> Result<Expression, String> {
         match expr {
@@ -67,6 +72,7 @@ impl Interpreter {
             _ => true,
         }
     }
+
     fn is_equal(e1: &Expression, e2: &Expression) -> bool {
         match (e1, e2) {
             (Expression::Number(n), Expression::Number(m)) => n == m,
@@ -75,5 +81,18 @@ impl Interpreter {
             (Expression::Nil, Expression::Nil) => true,
             _ => false,
         }
+    }
+
+    fn execute(statement: Statement) -> Result<(), String> {
+        match statement {
+            Statement::Print(expr) => {
+                let val = Self::evaluate(expr)?;
+                println!("{:?}", val);
+            }
+            Statement::Expression(expr) => {
+                Self::evaluate(expr)?;
+            }
+        }
+        Ok(())
     }
 }

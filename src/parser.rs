@@ -13,6 +13,12 @@ use crate::scanner::{Token, TokenType};
 
 /// Types are not 1 to 1 with the grammar; deeply nested enums are impractical
 pub enum ASTNode {
+    Statement(Statement),
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Print(Expression),
     Expression(Expression),
 }
 
@@ -51,8 +57,12 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Expr {
-        self.expression()
+    pub fn parse(&mut self) -> Vec<Statement> {
+        let mut statements: Vec<Statement> = vec![];
+        while !self.is_at_end() {
+            statements.push(self.statement());
+        }
+        statements
     }
 
     fn consume_token(&mut self) -> Token {
@@ -162,5 +172,27 @@ impl Parser {
         } else {
             None
         }
+    }
+
+    fn statement(&mut self) -> Statement {
+        if self.is_next(&[TokenType::Print]) {
+            self.consume_token();
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> Statement {
+        let expr = self.expression();
+        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        Statement::Print(expr)
+    }
+
+
+    fn expression_statement(&mut self) -> Statement {
+        let expr = self.expression();
+        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        Statement::Expression(expr)
     }
 }
