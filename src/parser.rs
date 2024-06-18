@@ -3,7 +3,8 @@
 use crate::scanner::{Token, TokenType};
 
 /// Grammar rules for lox:
-/// expression   -> equality ;
+/// expression   -> assignment ;
+/// assignment   -> IDENTIFIER '=' expression | equality ;
 /// equality     -> comparison (("==" | "!=") comparison)* ;
 /// comparison   -> term (( ">" | ">=" | "<" | "<=" ) term)* ;
 /// term         -> factor (( "-" | "+" ) factor )* ;
@@ -42,15 +43,17 @@ pub enum Expression {
         operand: Box<Expression>,
     },
     Grouping(Box<Expression>),
+    Assign(Token, Box<Expression>),
+    Variable(Token),
     // Literals
     Number(f64),
     String(String),
     Bool(bool),
-    Variable(Token),
     Nil,
 }
 use Expression as Expr;
 use TokenType as Type;
+use crate::parser::Expr::Assign;
 
 pub(crate) struct Parser {
     tokens: Vec<Token>, // stored in reversed order so popping is more efficient
@@ -98,7 +101,7 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Expr {
-        self.equality()
+        self.assignment()
     }
 
     fn binary_parser(
@@ -224,5 +227,19 @@ impl Parser {
 
         self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
         Statement::VarDecl(iden, initalizer)
+    }
+    fn assignment(&mut self) -> Expression {
+        let expr = self.equality();
+
+        if self.is_next(&[TokenType::Equal]) {
+            if let Expression::Variable(tok) = expr {
+                self.consume_token();
+                let val = self.assignment();
+                return Assign(tok, Box::from(val));
+            }
+            panic!("Invalid assignment target");
+        }
+
+        expr
     }
 }
