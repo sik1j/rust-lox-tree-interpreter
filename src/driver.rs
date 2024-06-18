@@ -4,12 +4,16 @@ use std::{env, fs};
 use crate::interpreter::Interpreter;
 use crate::parser::{Expression, Parser};
 
-pub struct Driver {}
+pub struct Driver {
+    interpreter: Interpreter,
+}
 
 type ExitCode = i32;
 impl Driver {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            interpreter: Interpreter::new(),
+        }
     }
 
     pub fn main_loop(&mut self) {
@@ -58,7 +62,7 @@ impl Driver {
         parser = Parser::new(tokens);
         let statements = parser.parse();
 
-        Interpreter::interpret(statements);
+        self.interpreter.interpret(statements);
 
 
         0

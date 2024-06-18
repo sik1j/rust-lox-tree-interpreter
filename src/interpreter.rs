@@ -1,30 +1,43 @@
+use crate::environment::Environment;
 use crate::parser::Expression;
 use crate::parser::Statement;
 use crate::scanner::{Token, TokenType};
 
 #[derive(Debug)]
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
-    pub fn interpret(statements: Vec<Statement>) {
+    pub fn new() -> Self {
+        Interpreter {
+            environment: Environment::new(),
+        }
+    }
+
+    pub fn interpret(&mut self, statements: Vec<Statement>) {
         for statement in statements {
-            if let Err(msg) = Self::execute(statement) {
+            if let Err(msg) = self.execute(statement) {
                 println!("{}", msg);
             }
         }
     }
-    fn evaluate(expr: Expression) -> Result<Expression, String> {
+    fn evaluate(&mut self, expr: Expression) -> Result<Expression, String> {
         match expr {
-            Expression::Binary { left, operator, right } => Self::eval_binary(*left, operator, *right),
-            Expression::Unary { operator, operand } => Self::eval_unary(operator, *operand),
-            Expression::Grouping(expr) => Self::evaluate(*expr),
+            Expression::Binary { left, operator, right } => self.eval_binary(*left, operator, *right),
+            Expression::Unary { operator, operand } => self.eval_unary(operator, *operand),
+            Expression::Grouping(expr) => self.evaluate(*expr),
+            Expression::Variable(var_tok) => {
+                 let val = self.environment.get(&var_tok.lexeme);
+                Ok(val)
+            },
             _ => Ok(expr)
         }
     }
 
-    fn eval_binary(lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
-        let lhs = Self::evaluate(lhs)?;
-        let rhs = Self::evaluate(rhs)?;
+    fn eval_binary(&mut self, lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
+        let lhs = self.evaluate(lhs)?;
+        let rhs = self.evaluate(rhs)?;
 
         Ok(match &op.token_type {
             TokenType::EqualEqual => Expression::Bool(Self::is_equal(&lhs, &rhs)),
@@ -52,8 +65,8 @@ impl Interpreter {
 
     }
 
-    fn eval_unary(operator: Token, operand: Expression) -> Result<Expression, String> {
-        let rhs = Self::evaluate(operand)?;
+    fn eval_unary(&mut self, operator: Token, operand: Expression) -> Result<Expression, String> {
+        let rhs = self.evaluate(operand)?;
 
         Ok(match operator.token_type {
             TokenType::Minus => match &rhs {
@@ -83,16 +96,26 @@ impl Interpreter {
         }
     }
 
-    fn execute(statement: Statement) -> Result<(), String> {
+    fn execute(&mut self, statement: Statement) -> Result<(), String> {
         match statement {
             Statement::Print(expr) => {
-                let val = Self::evaluate(expr)?;
+                let val = self.evaluate(expr)?;
                 println!("{:?}", val);
             }
             Statement::Expression(expr) => {
-                Self::evaluate(expr)?;
-            }
-        }
+                self.evaluate(expr)?;
+            },
+            Statement::VarDecl(tok, init) => {
+                let val;
+                if let Some(expr) = init {
+                    val = Some(self.evaluate(expr)?);
+                } else {
+                    val = None;
+                }
+
+                self.environment.define(&tok.lexeme, val);
+            },
+        };
         Ok(())
     }
 }

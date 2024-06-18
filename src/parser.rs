@@ -30,7 +30,7 @@ pub enum Statement {
     VarDecl(Token, Option<Expression>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Binary {
         left: Box<Expression>,
