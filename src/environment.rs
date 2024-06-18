@@ -16,6 +16,15 @@ impl Environment {
         self.values.insert(name.to_string(), value);
     }
 
+    pub fn assign(&mut self, name: &str, value: Expression) -> Result<(), String> {
+        if self.values.contains_key(name) {
+            self.values.insert(name.to_string(), Some(value));
+            Ok(())
+        } else {
+            Err(format!("Undefined variable: {name}"))
+        }
+    }
+
     pub fn get(&self, name: &str) -> Expression {
         match self.values.get(name) {
             Some(val) => match val {

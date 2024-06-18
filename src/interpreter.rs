@@ -31,6 +31,11 @@ impl Interpreter {
                  let val = self.environment.get(&var_tok.lexeme);
                 Ok(val)
             },
+            Expression::Assign(tok, rhs) => {
+                let val = self.evaluate(*rhs)?;
+                self.environment.assign(&tok.lexeme, val.clone())?;
+                Ok(val)
+            },
             _ => Ok(expr)
         }
     }
