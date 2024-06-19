@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use crate::parser::Expression;
 
-#[derive(Debug)]
-pub struct Environment<'a> {
-    enclosing_environment: Option<&'a mut  Environment<'a>>,
+#[derive(Debug, Default)]
+pub struct Environment {
+    pub enclosing_environment: Option<Box<Environment>>,
     values: HashMap<String, Expression>,
 }
 
-impl Environment<'_> {
+impl Environment {
     pub fn without_scope() -> Self {
         Environment {
             enclosing_environment: None,
@@ -15,7 +15,7 @@ impl Environment<'_> {
         }
     }
 
-    pub fn with_scope<'a>(enclosing_scope: &'a mut Environment<'a>) -> Environment<'a> {
+    pub fn with_scope(enclosing_scope: Box<Environment>) -> Environment {
         Environment {
             enclosing_environment: Some(enclosing_scope),
             values: HashMap::new(),
