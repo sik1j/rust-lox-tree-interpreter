@@ -15,9 +15,10 @@ use crate::scanner::{Token, TokenType};
 /// program      -> declaration* EOF ;
 /// declaration  -> varDecl | statement ;
 /// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
-/// statement    -> exprStmt | printStmt ;
+/// statement    -> exprStmt | printStmt | block ;
 /// exprStmt     -> expression ';' ;
 /// printStmt    -> "print" expression ';' ;
+/// block        -> '{' declaration* '}'
 
 /// Types are not 1 to 1 with the grammar; deeply nested enums are impractical
 pub enum ASTNode {
@@ -28,7 +29,8 @@ pub enum ASTNode {
 pub enum Statement {
     Print(Expression),
     Expression(Expression),
-    VarDecl(Token, Option<Expression>)
+    VarDecl(Token, Option<Expression>),
+    Block(Vec<Statement>),
 }
 
 #[derive(Debug, Clone)]
@@ -191,6 +193,9 @@ impl Parser {
         if self.is_next(&[TokenType::Print]) {
             self.consume_token();
             self.print_statement()
+        } else if self.is_next(&[TokenType::LeftBrace]){
+            self.consume_token();
+            self.block_statement()
         } else {
             self.expression_statement()
         }
@@ -241,5 +246,19 @@ impl Parser {
         }
 
         expr
+    }
+
+    fn block_statement(&mut self) -> Statement {
+        Statement::Block(self.parse_block())
+    }
+
+    fn parse_block(&mut self) -> Vec<Statement> {
+        let mut statements = vec![];
+
+        while !self.is_next(&[TokenType::RightBrace]) && !self.is_at_end() {
+            statements.push(self.declaration());
+        }
+        self.expect_token(TokenType::RightBrace).expect("Expected a closing '}'");
+        statements
     }
 }

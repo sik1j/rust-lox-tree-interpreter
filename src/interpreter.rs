@@ -120,6 +120,17 @@ impl Interpreter {
 
                 self.environment.define(&tok.lexeme, val);
             },
+            Statement::Block(statements) => {
+                let cur_scope = std::mem::take(&mut self.environment);
+                self.environment = Environment::with_scope(Box::new(cur_scope));
+
+                for statement in statements {
+                    self.execute(statement)?;
+                }
+
+                let enclosing = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
+                self.environment = *enclosing;
+            },
         };
         Ok(())
     }
