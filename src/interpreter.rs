@@ -4,14 +4,14 @@ use crate::parser::Statement;
 use crate::scanner::{Token, TokenType};
 
 #[derive(Debug)]
-pub struct Interpreter {
-    environment: Environment,
+pub struct Interpreter<'a> {
+    environment: Environment<'a>,
 }
 
-impl Interpreter {
+impl Interpreter<'_> {
     pub fn new() -> Self {
         Interpreter {
-            environment: Environment::new(),
+            environment: Environment::without_scope(),
         }
     }
 

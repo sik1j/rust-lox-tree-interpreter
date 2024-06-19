@@ -4,12 +4,12 @@ use std::{env, fs};
 use crate::interpreter::Interpreter;
 use crate::parser::{Expression, Parser};
 
-pub struct Driver {
-    interpreter: Interpreter,
+pub struct Driver<'a> {
+    interpreter: Interpreter<'a>,
 }
 
 type ExitCode = i32;
-impl Driver {
+impl Driver<'_> {
     pub fn new() -> Self {
         Self {
             interpreter: Interpreter::new(),
