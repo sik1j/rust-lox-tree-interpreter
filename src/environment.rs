@@ -3,7 +3,7 @@ use crate::parser::Expression;
 
 #[derive(Debug)]
 pub struct Environment {
-    values: HashMap<String, Option<Expression>>,
+    values: HashMap<String, Expression>,
 }
 
 impl Environment {
@@ -13,12 +13,13 @@ impl Environment {
         }
     }
     pub fn define(&mut self, name: &str, value: Option<Expression>) {
-        self.values.insert(name.to_string(), value);
+        let val = value.unwrap_or(Expression::Nil);
+        self.values.insert(name.to_string(), val);
     }
 
     pub fn assign(&mut self, name: &str, value: Expression) -> Result<(), String> {
         if self.values.contains_key(name) {
-            self.values.insert(name.to_string(), Some(value));
+            self.values.insert(name.to_string(), value);
             Ok(())
         } else {
             Err(format!("Undefined variable: {name}"))
@@ -27,10 +28,7 @@ impl Environment {
 
     pub fn get(&self, name: &str) -> Expression {
         match self.values.get(name) {
-            Some(val) => match val {
-                None => Expression::Nil,
-                Some(val) => (*val).clone(),
-            },
+            Some(val) => (*val).clone(),
             None => panic!("var '{}' not defined", name)
         }
     }
