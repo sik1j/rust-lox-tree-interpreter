@@ -131,6 +131,14 @@ impl Interpreter {
                 let enclosing = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
                 self.environment = *enclosing;
             },
+            Statement::If(expr, if_then, else_then) => {
+                let val = self.evaluate(expr)?;
+                if Self::is_truthy(&val) {
+                    self.execute(*if_then)?;
+                } else if let Some(branch) = else_then {
+                    self.execute(*branch)?;
+                };
+            },
         };
         Ok(())
     }

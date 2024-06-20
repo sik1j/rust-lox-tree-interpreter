@@ -4,7 +4,9 @@ use crate::scanner::{Token, TokenType};
 
 /// Grammar rules for lox:
 /// expression   -> assignment ;
-/// assignment   -> IDENTIFIER '=' expression | equality ;
+/// assignment   -> IDENTIFIER '=' expression | logic_or ;
+/// logic_or     -> logic_and ( "or" logic_and )* ;
+/// logic_and    -> equality ( "and" equality )* ;
 /// equality     -> comparison (("==" | "!=") comparison)* ;
 /// comparison   -> term (( ">" | ">=" | "<" | "<=" ) term)* ;
 /// term         -> factor (( "-" | "+" ) factor )* ;
@@ -15,8 +17,10 @@ use crate::scanner::{Token, TokenType};
 /// program      -> declaration* EOF ;
 /// declaration  -> varDecl | statement ;
 /// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
-/// statement    -> exprStmt | printStmt | block ;
+///
+/// statement    -> exprStmt | ifStmt | printStmt | block ;
 /// exprStmt     -> expression ';' ;
+/// ifStmt       -> "if" '(' expression ')' statement ( "else" statement )? ;
 /// printStmt    -> "print" expression ';' ;
 /// block        -> '{' declaration* '}'
 
@@ -31,6 +35,7 @@ pub enum Statement {
     Expression(Expression),
     VarDecl(Token, Option<Expression>),
     Block(Vec<Statement>),
+    If(Expression, Box<Statement>, Option<Box<Statement>>)
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +52,7 @@ pub enum Expression {
     Grouping(Box<Expression>),
     Assign(Token, Box<Expression>),
     Variable(Token),
+    Logical(Box<Expression>, TokenType, Box<Expression>),
     // Literals
     Number(f64),
     String(String),
@@ -196,7 +202,11 @@ impl Parser {
         } else if self.is_next(&[TokenType::LeftBrace]){
             self.consume_token();
             self.block_statement()
-        } else {
+        } else if self.is_next(&[TokenType::If]) {
+            self.consume_token();
+            self.if_statement()
+        }
+        else {
             self.expression_statement()
         }
     }
@@ -260,5 +270,18 @@ impl Parser {
         }
         self.expect_token(TokenType::RightBrace).expect("Expected a closing '}'");
         statements
+    }
+    fn if_statement(&mut self) -> Statement {
+        self.expect_token(TokenType::LeftParen).expect("Expected a opening '('");
+        let condition = self.expression();
+        self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
+
+        let if_branch = self.statement();
+        let mut else_branch = None;
+        if self.is_next(&[TokenType::Else]) {
+            self.consume_token();
+            else_branch = Some(Box::from(self.statement()));
+        }
+        Statement::If(condition, Box::from(if_branch), else_branch)
     }
 }
