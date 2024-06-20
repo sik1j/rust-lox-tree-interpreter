@@ -18,10 +18,11 @@ use crate::scanner::{Token, TokenType};
 /// declaration  -> varDecl | statement ;
 /// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
 ///
-/// statement    -> exprStmt | ifStmt | printStmt | block ;
+/// statement    -> exprStmt | ifStmt | printStmt | whileStmt | block ;
 /// exprStmt     -> expression ';' ;
 /// ifStmt       -> "if" '(' expression ')' statement ( "else" statement )? ;
 /// printStmt    -> "print" expression ';' ;
+/// whileStmt    -> "while" '(' expression ')' statement ;
 /// block        -> '{' declaration* '}'
 
 /// Types are not 1 to 1 with the grammar; deeply nested enums are impractical
@@ -29,13 +30,14 @@ pub enum ASTNode {
     Statement(Statement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Print(Expression),
     Expression(Expression),
     VarDecl(Token, Option<Expression>),
     Block(Vec<Statement>),
-    If(Expression, Box<Statement>, Option<Box<Statement>>)
+    If(Expression, Box<Statement>, Option<Box<Statement>>),
+    While(Expression, Box<Statement>),
 }
 
 #[derive(Debug, Clone)]
@@ -205,6 +207,9 @@ impl Parser {
         } else if self.is_next(&[TokenType::If]) {
             self.consume_token();
             self.if_statement()
+        } else if self.is_next(&[TokenType::While]) {
+            self.consume_token();
+            self.while_statement()
         }
         else {
             self.expression_statement()
@@ -308,5 +313,15 @@ impl Parser {
         }
 
         lhs
+    }
+
+    fn while_statement(&mut self) -> Statement {
+        self.expect_token(TokenType::LeftParen).expect("Expected an opening '('");
+        let condition = self.expression();
+        self.expect_token(TokenType::RightParen).expect("Expected a closing  ')'");
+
+        let body = self.statement();
+
+        Statement::While(condition, Box::from(body))
     }
 }

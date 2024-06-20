@@ -140,6 +140,12 @@ impl Interpreter {
                     self.execute(*branch)?;
                 };
             },
+            Statement::While(condition, body) => {
+                while Self::is_truthy(&self.evaluate(condition.clone())?) {
+                    self.execute((*body).clone())?;
+                }
+
+            }
         };
         Ok(())
     }

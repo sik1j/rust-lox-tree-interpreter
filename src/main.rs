@@ -1,8 +1,8 @@
 mod driver;
+mod environment;
+mod interpreter;
 mod parser;
 mod scanner;
-mod interpreter;
-mod environment;
 
 use driver::Driver;
 fn main() {
