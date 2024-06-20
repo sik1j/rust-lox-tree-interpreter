@@ -52,7 +52,7 @@ pub enum Expression {
     Grouping(Box<Expression>),
     Assign(Token, Box<Expression>),
     Variable(Token),
-    Logical(Box<Expression>, TokenType, Box<Expression>),
+    Logical(Box<Expression>, Token, Box<Expression>),
     // Literals
     Number(f64),
     String(String),
@@ -244,7 +244,7 @@ impl Parser {
         Statement::VarDecl(iden, initalizer)
     }
     fn assignment(&mut self) -> Expression {
-        let expr = self.equality();
+        let expr = self.or();
 
         if self.is_next(&[TokenType::Equal]) {
             if let Expression::Variable(tok) = expr {
@@ -271,6 +271,7 @@ impl Parser {
         self.expect_token(TokenType::RightBrace).expect("Expected a closing '}'");
         statements
     }
+
     fn if_statement(&mut self) -> Statement {
         self.expect_token(TokenType::LeftParen).expect("Expected a opening '('");
         let condition = self.expression();
@@ -283,5 +284,29 @@ impl Parser {
             else_branch = Some(Box::from(self.statement()));
         }
         Statement::If(condition, Box::from(if_branch), else_branch)
+    }
+
+    fn or(&mut self) -> Expr {
+        let mut lhs = self.and();
+
+        while self.is_next(&[TokenType::Or]) {
+            let op = self.consume_token();
+            let rhs = self.and();
+            lhs = Expression::Logical(Box::from(lhs), op, Box::from(rhs));
+        }
+
+        lhs
+    }
+
+    fn and(&mut self) -> Expr {
+        let mut lhs = self.equality();
+
+        while self.is_next(&[TokenType::And]) {
+            let op = self.consume_token();
+            let rhs = self.equality();
+            lhs = Expression::Logical(Box::from(lhs), op, Box::from(rhs));
+        }
+
+        lhs
     }
 }

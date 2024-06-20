@@ -36,7 +36,8 @@ impl Interpreter {
                 self.environment.assign(&tok.lexeme, val.clone())?;
                 Ok(val)
             },
-            _ => Ok(expr)
+            Expression::Logical(lhs, op, rhs) => self.eval_logical(*lhs, op, *rhs),
+            Expression::Number(_) | Expression::String(_) | Expression::Bool(_) | Expression::Nil => Ok(expr),
         }
     }
 
@@ -141,5 +142,15 @@ impl Interpreter {
             },
         };
         Ok(())
+    }
+
+    fn eval_logical(&mut self, lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
+        let lhs_val = self.evaluate(lhs)?;
+
+        match (op.token_type, Self::is_truthy(&lhs_val)) {
+            (TokenType::Or, true) | (TokenType::And, false) => Ok(lhs_val),
+            (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(rhs),
+            (other, _) => panic!("Unexpected token {:?}", other)
+        }
     }
 }
