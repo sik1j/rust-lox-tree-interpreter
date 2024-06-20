@@ -18,11 +18,15 @@ use crate::scanner::{Token, TokenType};
 /// declaration  -> varDecl | statement ;
 /// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
 ///
-/// statement    -> exprStmt | ifStmt | printStmt | whileStmt | block ;
+/// statement    -> exprStmt | ifStmt | printStmt | whileStmt | forStmt | block ;
 /// exprStmt     -> expression ';' ;
 /// ifStmt       -> "if" '(' expression ')' statement ( "else" statement )? ;
 /// printStmt    -> "print" expression ';' ;
 /// whileStmt    -> "while" '(' expression ')' statement ;
+/// forStmt      -> "for" '('
+///                 ( (varDecl | expressionStmt ) | ';' )
+///                 expression? ';'
+///                 expression? ';' ')' statement ;
 /// block        -> '{' declaration* '}'
 
 /// Types are not 1 to 1 with the grammar; deeply nested enums are impractical
@@ -61,7 +65,6 @@ pub enum Expression {
     Bool(bool),
     Nil,
 }
-use crate::parser::Expr::Assign;
 use Expression as Expr;
 use TokenType as Type;
 
@@ -108,6 +111,23 @@ impl Parser {
 
     fn is_at_end(&self) -> bool {
         self.next_token().token_type == Type::Eof
+    }
+
+    fn expect_token(&mut self, expected: TokenType) -> Option<Token> {
+        if self.is_next(&[expected]) {
+            Some(self.consume_token())
+        } else {
+            None
+        }
+    }
+
+    fn match_consume(&mut self, expected: TokenType) -> bool {
+        if self.is_next(&[expected]) {
+            self.consume_token();
+            true
+        } else {
+            false
+        }
     }
 
     fn expression(&mut self) -> Expr {
@@ -190,27 +210,17 @@ impl Parser {
         }
     }
 
-    fn expect_token(&mut self, expected: TokenType) -> Option<Token> {
-        if self.is_next(&[expected]) {
-            Some(self.consume_token())
-        } else {
-            None
-        }
-    }
-
     fn statement(&mut self) -> Statement {
-        if self.is_next(&[TokenType::Print]) {
-            self.consume_token();
+        if self.match_consume(TokenType::Print) {
             self.print_statement()
-        } else if self.is_next(&[TokenType::LeftBrace]) {
-            self.consume_token();
+        } else if self.match_consume(TokenType::LeftBrace) {
             self.block_statement()
-        } else if self.is_next(&[TokenType::If]) {
-            self.consume_token();
+        } else if self.match_consume(TokenType::If) {
             self.if_statement()
-        } else if self.is_next(&[TokenType::While]) {
-            self.consume_token();
+        } else if self.match_consume(TokenType::While) {
             self.while_statement()
+        } else if self.match_consume(TokenType::For) {
+            self.for_statement()
         } else {
             self.expression_statement()
         }
@@ -230,8 +240,7 @@ impl Parser {
         Statement::Expression(expr)
     }
     fn declaration(&mut self) -> Statement {
-        if self.is_next(&[TokenType::Var]) {
-            self.consume_token();
+        if self.match_consume(TokenType::Var) {
             self.var_declaration()
         } else {
             self.statement()
@@ -243,8 +252,7 @@ impl Parser {
             .expect("Expected an identifier");
 
         let mut initalizer = None;
-        if self.is_next(&[TokenType::Equal]) {
-            self.consume_token();
+        if self.match_consume(TokenType::Equal) {
             initalizer = Some(self.expression());
         }
 
@@ -259,7 +267,7 @@ impl Parser {
             if let Expression::Variable(tok) = expr {
                 self.consume_token();
                 let val = self.assignment();
-                return Assign(tok, Box::from(val));
+                return Expression::Assign(tok, Box::from(val));
             }
             panic!("Invalid assignment target");
         }
@@ -291,8 +299,7 @@ impl Parser {
 
         let if_branch = self.statement();
         let mut else_branch = None;
-        if self.is_next(&[TokenType::Else]) {
-            self.consume_token();
+        if self.match_consume(TokenType::Else) {
             else_branch = Some(Box::from(self.statement()));
         }
         Statement::If(condition, Box::from(if_branch), else_branch)
@@ -332,5 +339,50 @@ impl Parser {
         let body = self.statement();
 
         Statement::While(condition, Box::from(body))
+    }
+
+    fn for_statement(&mut self) -> Statement {
+        self.expect_token(TokenType::LeftParen)
+            .expect("Expected an opening '('");
+
+        let initalizer;
+        if self.match_consume(TokenType::Semicolon) {
+            initalizer = None;
+        } else if self.match_consume(TokenType::Var) {
+            initalizer = Some(self.var_declaration());
+        } else {
+            initalizer = Some(self.expression_statement());
+        }
+
+        let mut condition = None;
+        if !self.is_next(&[TokenType::Semicolon]) {
+            condition = Some(self.expression());
+        }
+        self.expect_token(TokenType::Semicolon)
+            .expect("Expected a ';'");
+
+        let mut side_effect = None;
+        if !self.is_next(&[TokenType::RightParen]) {
+            side_effect = Some(self.expression());
+        }
+        self.expect_token(TokenType::RightParen)
+            .expect("Expected a ')'");
+
+        // Statement::Block(vec![initalizer.unwrap(), self.statement()])
+
+        let mut body = self.statement();
+        if let Some(effect) = side_effect {
+            body = Statement::Block(vec![body, Statement::Expression(effect)]);
+        }
+
+        let while_version = Statement::While(
+            condition.unwrap_or_else(|| Expression::Bool(true)),
+            Box::from(body),
+        );
+
+        Statement::Block(match initalizer {
+            None => vec![while_version],
+            Some(init) => vec![init, while_version],
+        })
     }
 }
