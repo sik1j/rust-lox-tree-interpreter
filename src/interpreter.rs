@@ -24,32 +24,43 @@ impl Interpreter {
     }
     fn evaluate(&mut self, expr: Expression) -> Result<Expression, String> {
         match expr {
-            Expression::Binary { left, operator, right } => self.eval_binary(*left, operator, *right),
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => self.eval_binary(*left, operator, *right),
             Expression::Unary { operator, operand } => self.eval_unary(operator, *operand),
             Expression::Grouping(expr) => self.evaluate(*expr),
             Expression::Variable(var_tok) => {
-                 let val = self.environment.get(&var_tok.lexeme);
+                let val = self.environment.get(&var_tok.lexeme);
                 Ok(val)
-            },
+            }
             Expression::Assign(tok, rhs) => {
                 let val = self.evaluate(*rhs)?;
                 self.environment.assign(&tok.lexeme, val.clone())?;
                 Ok(val)
-            },
+            }
             Expression::Logical(lhs, op, rhs) => self.eval_logical(*lhs, op, *rhs),
-            Expression::Number(_) | Expression::String(_) | Expression::Bool(_) | Expression::Nil => Ok(expr),
+            Expression::Number(_)
+            | Expression::String(_)
+            | Expression::Bool(_)
+            | Expression::Nil => Ok(expr),
         }
     }
 
-    fn eval_binary(&mut self, lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
+    fn eval_binary(
+        &mut self,
+        lhs: Expression,
+        op: Token,
+        rhs: Expression,
+    ) -> Result<Expression, String> {
         let lhs = self.evaluate(lhs)?;
         let rhs = self.evaluate(rhs)?;
 
         Ok(match &op.token_type {
             TokenType::EqualEqual => Expression::Bool(Self::is_equal(&lhs, &rhs)),
             TokenType::BangEqual => Expression::Bool(!Self::is_equal(&lhs, &rhs)),
-            _ =>
-            match (&lhs, &rhs) {
+            _ => match (&lhs, &rhs) {
                 (Expression::Number(lhs), Expression::Number(rhs)) => match &op.token_type {
                     TokenType::Plus => Expression::Number(lhs + rhs),
                     TokenType::Minus => Expression::Number(lhs - rhs),
@@ -59,16 +70,22 @@ impl Interpreter {
                     TokenType::GreaterEqual => Expression::Bool(lhs >= rhs),
                     TokenType::Less => Expression::Bool(lhs < rhs),
                     TokenType::LessEqual => Expression::Bool(lhs <= rhs),
-                    _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs))
+                    _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs)),
                 },
-                (Expression::String(lhs), Expression::String(rhs)) => Expression::String(match &op.token_type {
-                    TokenType::Plus => format!("{}{}", lhs, rhs),
-                    _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs))
-                }),
-                _ => return Err(format!("Cannot perform '{:?} {} {:?}'", lhs, op.lexeme, rhs))
-            }
+                (Expression::String(lhs), Expression::String(rhs)) => {
+                    Expression::String(match &op.token_type {
+                        TokenType::Plus => format!("{}{}", lhs, rhs),
+                        _ => return Err(format!("Cannot perform '{} {} {}'", lhs, op.lexeme, rhs)),
+                    })
+                }
+                _ => {
+                    return Err(format!(
+                        "Cannot perform '{:?} {} {:?}'",
+                        lhs, op.lexeme, rhs
+                    ))
+                }
+            },
         })
-
     }
 
     fn eval_unary(&mut self, operator: Token, operand: Expression) -> Result<Expression, String> {
@@ -77,10 +94,10 @@ impl Interpreter {
         Ok(match operator.token_type {
             TokenType::Minus => match &rhs {
                 Expression::Number(n) => Expression::Number(-n),
-                _ => return Err(format!("Cannot apply '-' to {:?}", rhs))
+                _ => return Err(format!("Cannot apply '-' to {:?}", rhs)),
             },
             TokenType::Bang => Expression::Bool(!Self::is_truthy(&rhs)),
-            _ => return Err(format!("Cannot apply '-' to {:?}", rhs))
+            _ => return Err(format!("Cannot apply '-' to {:?}", rhs)),
         })
     }
 
@@ -110,7 +127,7 @@ impl Interpreter {
             }
             Statement::Expression(expr) => {
                 self.evaluate(expr)?;
-            },
+            }
             Statement::VarDecl(tok, init) => {
                 let val;
                 if let Some(expr) = init {
@@ -120,7 +137,7 @@ impl Interpreter {
                 }
 
                 self.environment.define(&tok.lexeme, val);
-            },
+            }
             Statement::Block(statements) => {
                 let cur_scope = std::mem::take(&mut self.environment);
                 self.environment = Environment::with_scope(Box::new(cur_scope));
@@ -129,9 +146,10 @@ impl Interpreter {
                     self.execute(statement)?;
                 }
 
-                let enclosing = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
+                let enclosing =
+                    std::mem::take(&mut self.environment.enclosing_environment).unwrap();
                 self.environment = *enclosing;
-            },
+            }
             Statement::If(expr, if_then, else_then) => {
                 let val = self.evaluate(expr)?;
                 if Self::is_truthy(&val) {
@@ -139,24 +157,28 @@ impl Interpreter {
                 } else if let Some(branch) = else_then {
                     self.execute(*branch)?;
                 };
-            },
+            }
             Statement::While(condition, body) => {
                 while Self::is_truthy(&self.evaluate(condition.clone())?) {
                     self.execute((*body).clone())?;
                 }
-
             }
         };
         Ok(())
     }
 
-    fn eval_logical(&mut self, lhs: Expression, op: Token, rhs: Expression) -> Result<Expression, String> {
+    fn eval_logical(
+        &mut self,
+        lhs: Expression,
+        op: Token,
+        rhs: Expression,
+    ) -> Result<Expression, String> {
         let lhs_val = self.evaluate(lhs)?;
 
         match (op.token_type, Self::is_truthy(&lhs_val)) {
             (TokenType::Or, true) | (TokenType::And, false) => Ok(lhs_val),
             (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(rhs),
-            (other, _) => panic!("Unexpected token {:?}", other)
+            (other, _) => panic!("Unexpected token {:?}", other),
         }
     }
 }

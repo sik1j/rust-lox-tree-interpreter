@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::parser::Expression;
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct Environment {
@@ -28,9 +28,16 @@ impl Environment {
     }
 
     pub fn assign(&mut self, name: &str, value: Expression) -> Result<(), String> {
-        match (self.values.contains_key(name), &mut self.enclosing_environment) {
-            (true, _) => {self.values.insert(name.to_string(), value);},
-            (false, Some(enclosing_env)) => { enclosing_env.assign(name, value)?;},
+        match (
+            self.values.contains_key(name),
+            &mut self.enclosing_environment,
+        ) {
+            (true, _) => {
+                self.values.insert(name.to_string(), value);
+            }
+            (false, Some(enclosing_env)) => {
+                enclosing_env.assign(name, value)?;
+            }
             (false, None) => return Err(format!("Undefined variable: {name}")),
         };
         Ok(())

@@ -113,7 +113,10 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(TokenType::Eof, "".to_string(), self.tok_line));
-        (std::mem::take(&mut self.tokens), std::mem::take(&mut self.errors))
+        (
+            std::mem::take(&mut self.tokens),
+            std::mem::take(&mut self.errors),
+        )
     }
 
     fn is_at_end(&self) -> bool {
@@ -270,9 +273,11 @@ impl Scanner {
         let num_str = &self.source[self.tok_start..self.tok_curr];
         let num = match f64::from_str(num_str) {
             Ok(n) => n,
-            Err(_) => return {
-                self.error(&format!("Could not parse number: {}", num_str));
-            },
+            Err(_) => {
+                return {
+                    self.error(&format!("Could not parse number: {}", num_str));
+                }
+            }
         };
 
         self.add_token(TokenType::Number(num));

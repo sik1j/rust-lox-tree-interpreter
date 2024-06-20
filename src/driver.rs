@@ -1,8 +1,8 @@
+use crate::interpreter::Interpreter;
+use crate::parser::{Expression, Parser};
 use crate::scanner::Scanner;
 use std::io::{BufRead, Write};
 use std::{env, fs};
-use crate::interpreter::Interpreter;
-use crate::parser::{Expression, Parser};
 
 pub struct Driver {
     interpreter: Interpreter,
@@ -55,7 +55,7 @@ impl Driver {
             for error in errors {
                 println!("{:?}", error);
             }
-            return 65
+            return 65;
         }
 
         let mut parser;
@@ -67,7 +67,6 @@ impl Driver {
         // }
 
         self.interpreter.interpret(statements);
-
 
         0
     }

@@ -61,9 +61,9 @@ pub enum Expression {
     Bool(bool),
     Nil,
 }
+use crate::parser::Expr::Assign;
 use Expression as Expr;
 use TokenType as Type;
-use crate::parser::Expr::Assign;
 
 pub(crate) struct Parser {
     tokens: Vec<Token>, // stored in reversed order so popping is more efficient
@@ -181,7 +181,8 @@ impl Parser {
             Type::Nil => Expr::Nil,
             Type::LeftParen => {
                 let expr = self.expression();
-                self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
+                self.expect_token(TokenType::RightParen)
+                    .expect("Expected a closing ')'");
                 Expr::Grouping(Box::from(expr))
             }
             Type::Identifier => Expr::Variable(tok),
@@ -201,7 +202,7 @@ impl Parser {
         if self.is_next(&[TokenType::Print]) {
             self.consume_token();
             self.print_statement()
-        } else if self.is_next(&[TokenType::LeftBrace]){
+        } else if self.is_next(&[TokenType::LeftBrace]) {
             self.consume_token();
             self.block_statement()
         } else if self.is_next(&[TokenType::If]) {
@@ -210,22 +211,22 @@ impl Parser {
         } else if self.is_next(&[TokenType::While]) {
             self.consume_token();
             self.while_statement()
-        }
-        else {
+        } else {
             self.expression_statement()
         }
     }
 
     fn print_statement(&mut self) -> Statement {
         let expr = self.expression();
-        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        self.expect_token(TokenType::Semicolon)
+            .expect("Expected a ';'");
         Statement::Print(expr)
     }
 
-
     fn expression_statement(&mut self) -> Statement {
         let expr = self.expression();
-        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        self.expect_token(TokenType::Semicolon)
+            .expect("Expected a ';'");
         Statement::Expression(expr)
     }
     fn declaration(&mut self) -> Statement {
@@ -237,7 +238,9 @@ impl Parser {
         }
     }
     fn var_declaration(&mut self) -> Statement {
-        let iden = self.expect_token(TokenType::Identifier).expect("Expected an identifier");
+        let iden = self
+            .expect_token(TokenType::Identifier)
+            .expect("Expected an identifier");
 
         let mut initalizer = None;
         if self.is_next(&[TokenType::Equal]) {
@@ -245,7 +248,8 @@ impl Parser {
             initalizer = Some(self.expression());
         }
 
-        self.expect_token(TokenType::Semicolon).expect("Expected a ';'");
+        self.expect_token(TokenType::Semicolon)
+            .expect("Expected a ';'");
         Statement::VarDecl(iden, initalizer)
     }
     fn assignment(&mut self) -> Expression {
@@ -273,14 +277,17 @@ impl Parser {
         while !self.is_next(&[TokenType::RightBrace]) && !self.is_at_end() {
             statements.push(self.declaration());
         }
-        self.expect_token(TokenType::RightBrace).expect("Expected a closing '}'");
+        self.expect_token(TokenType::RightBrace)
+            .expect("Expected a closing '}'");
         statements
     }
 
     fn if_statement(&mut self) -> Statement {
-        self.expect_token(TokenType::LeftParen).expect("Expected a opening '('");
+        self.expect_token(TokenType::LeftParen)
+            .expect("Expected a opening '('");
         let condition = self.expression();
-        self.expect_token(TokenType::RightParen).expect("Expected a closing ')'");
+        self.expect_token(TokenType::RightParen)
+            .expect("Expected a closing ')'");
 
         let if_branch = self.statement();
         let mut else_branch = None;
@@ -316,9 +323,11 @@ impl Parser {
     }
 
     fn while_statement(&mut self) -> Statement {
-        self.expect_token(TokenType::LeftParen).expect("Expected an opening '('");
+        self.expect_token(TokenType::LeftParen)
+            .expect("Expected an opening '('");
         let condition = self.expression();
-        self.expect_token(TokenType::RightParen).expect("Expected a closing  ')'");
+        self.expect_token(TokenType::RightParen)
+            .expect("Expected a closing  ')'");
 
         let body = self.statement();
 
