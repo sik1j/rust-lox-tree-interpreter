@@ -12,10 +12,12 @@ use crate::scanner::{Token, TokenType};
 /// term         -> factor (( "-" | "+" ) factor )* ;
 /// factor       -> unary (( "/" | "*" ) unary )* ;
 /// unary        -> ( "!" | "-" ) unary | call ;
-/// call         -> primary ( "(" arguments? ")" )* ;
+/// call         -> function ( "(" arguments? ")" )* ;
+/// function     -> "fun"  '(' parameters? ')' | primary ;
 /// primary      -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
 ///
 /// arguments    -> expression ( ',' expression )* ;
+/// parameters   -> IDENTIFIER ( ',' IDENTIFIER )* ;
 ///
 /// program      -> declaration* EOF ;
 /// declaration  -> varDecl | statement ;
@@ -66,6 +68,11 @@ pub enum Expression {
         callee: Box<Expression>,
         arguments: Vec<Expression>,
         closing_paren: Token,
+    },
+    FunctionDecl {
+        name: Option<Token>,
+        params: Vec<Token>,
+        body: Vec<Statement>,
     },
     // Literals
     Number(f64),
@@ -200,7 +207,7 @@ impl Parser {
     }
 
     fn call(&mut self) -> Expr {
-        let mut expr = self.primary();
+        let mut expr = self.function();
 
         loop {
             if self.match_consume(TokenType::LeftParen) {
@@ -234,6 +241,43 @@ impl Parser {
             callee: Box::from(callee),
             closing_paren,
         }
+    }
+    fn function(&mut self) -> Expression {
+        if !self.match_consume(TokenType::Fun) {
+            return self.primary();
+        }
+
+        let mut name = None;
+        if self.is_next(&[TokenType::Identifier]) {
+            name = Some(self.consume_token());
+        }
+
+        self.expect_token(TokenType::LeftParen)
+            .expect("Expected '(' after token 'fun'");
+
+        let mut params = vec![];
+        if !self.is_next(&[TokenType::RightParen]) {
+            loop {
+                if params.len() >= 255 {
+                    panic!("Cannot have more than 255 parameters");
+                }
+                params.push(
+                    self.expect_token(TokenType::Identifier)
+                        .expect("Expected an identifier"),
+                );
+                if !self.match_consume(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        self.expect_token(TokenType::RightParen)
+            .expect("Expected a closing ')'");
+
+        self.expect_token(TokenType::LeftBrace)
+            .expect("Expected a body after function declaration");
+        let body = self.parse_block();
+
+        Expression::FunctionDecl { params, name, body }
     }
     fn primary(&mut self) -> Expr {
         let tok = self.consume_token();
