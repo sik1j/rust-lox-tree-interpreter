@@ -11,8 +11,11 @@ use crate::scanner::{Token, TokenType};
 /// comparison   -> term (( ">" | ">=" | "<" | "<=" ) term)* ;
 /// term         -> factor (( "-" | "+" ) factor )* ;
 /// factor       -> unary (( "/" | "*" ) unary )* ;
-/// unary        -> ( "!" | "-" ) unary | primary ;
+/// unary        -> ( "!" | "-" ) unary | call ;
+/// call         -> primary ( "(" arguments? ")" )* ;
 /// primary      -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+///
+/// arguments    -> expression ( ',' expression )* ;
 ///
 /// program      -> declaration* EOF ;
 /// declaration  -> varDecl | statement ;
@@ -59,6 +62,11 @@ pub enum Expression {
     Assign(Token, Box<Expression>),
     Variable(Token),
     Logical(Box<Expression>, Token, Box<Expression>),
+    Call {
+        callee: Box<Expression>,
+        arguments: Vec<Expression>,
+        closing_paren: Token,
+    },
     // Literals
     Number(f64),
     String(String),
@@ -188,9 +196,45 @@ impl Parser {
                 operand: Box::from(rhs),
             };
         }
-        self.primary()
+        self.call()
     }
 
+    fn call(&mut self) -> Expr {
+        let mut expr = self.primary();
+
+        loop {
+            if self.match_consume(TokenType::LeftParen) {
+                expr = self.finish_call(expr);
+            } else {
+                break;
+            }
+        }
+        expr
+    }
+    fn finish_call(&mut self, callee: Expression) -> Expr {
+        let mut arguments = vec![];
+
+        if !self.is_next(&[TokenType::RightParen]) {
+            loop {
+                if arguments.len() >= 255 {
+                    panic!("Cannot have more than 255 arguments");
+                }
+                arguments.push(self.expression());
+                if !self.match_consume(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        let closing_paren = self
+            .expect_token(TokenType::RightParen)
+            .expect("Expected closing paren ')'");
+        Expression::Call {
+            arguments,
+            callee: Box::from(callee),
+            closing_paren,
+        }
+    }
     fn primary(&mut self) -> Expr {
         let tok = self.consume_token();
         match tok.token_type {
