@@ -44,6 +44,7 @@ impl Interpreter {
             Expression::Number(_)
             | Expression::String(_)
             | Expression::Bool(_)
+            | Expression::Call { .. }
             | Expression::Nil => Ok(expr),
         }
     }
@@ -139,16 +140,11 @@ impl Interpreter {
                 self.environment.define(&tok.lexeme, val);
             }
             Statement::Block(statements) => {
-                let cur_scope = std::mem::take(&mut self.environment);
-                self.environment = Environment::with_scope(Box::new(cur_scope));
-
-                for statement in statements {
-                    self.execute(statement)?;
-                }
-
-                let enclosing =
-                    std::mem::take(&mut self.environment.enclosing_environment).unwrap();
-                self.environment = *enclosing;
+                let current_scope = std::mem::take(&mut self.environment);
+                self.execute_block(
+                    statements,
+                    Environment::with_scope(Box::from(current_scope)),
+                )?
             }
             Statement::If(expr, if_then, else_then) => {
                 let val = self.evaluate(expr)?;
@@ -163,10 +159,25 @@ impl Interpreter {
                     self.execute((*body).clone())?;
                 }
             }
+            Statement::Function(_) => {}
         };
         Ok(())
     }
+    pub fn execute_block(
+        &mut self,
+        statements: Vec<Statement>,
+        environment: Environment,
+    ) -> Result<(), String> {
+        self.environment = environment;
 
+        for statement in statements {
+            self.execute(statement)?;
+        }
+
+        let enclosing = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
+        self.environment = *enclosing;
+        Ok(())
+    }
     fn eval_logical(
         &mut self,
         lhs: Expression,

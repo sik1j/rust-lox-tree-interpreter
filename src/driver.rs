@@ -62,9 +62,11 @@ impl Driver {
         parser = Parser::new(tokens);
         let statements = parser.parse();
 
-        // for statement in statements {
-        //     println!("{:?}", statement);
-        // }
+        for statement in &statements {
+            println!("{:?}", statement);
+        }
+
+        println!("\n============== Interpreting below: ===============\n");
 
         self.interpreter.interpret(statements);
 
