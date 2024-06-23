@@ -18,8 +18,12 @@ use crate::scanner::{Token, TokenType};
 /// arguments    -> expression ( ',' expression )* ;
 ///
 /// program      -> declaration* EOF ;
-/// declaration  -> varDecl | statement ;
+/// declaration  -> funDecl | varDecl | statement ;
+/// funDecl      -> "fun" function ;
 /// varDecl      -> "var" IDENTIFIER ( '=' expression )? ';'
+///
+/// function     -> IDENTIFIER '(' parameters? ')' block ;
+/// arguments    -> IDENTIFIER ( ',' IDENTIFIER )* ;
 ///
 /// statement    -> exprStmt | ifStmt | printStmt | whileStmt | forStmt | block ;
 /// exprStmt     -> expression ';' ;
@@ -37,11 +41,24 @@ pub enum ASTNode {
     Statement(Statement),
 }
 
+#[derive(Debug)]
+pub enum FuncType {
+    Function,
+}
+
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Statement>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Statement {
     Print(Expression),
     Expression(Expression),
     VarDecl(Token, Option<Expression>),
+    Function(Function),
     Block(Vec<Statement>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
@@ -284,11 +301,44 @@ impl Parser {
         Statement::Expression(expr)
     }
     fn declaration(&mut self) -> Statement {
-        if self.match_consume(TokenType::Var) {
+        if self.match_consume(TokenType::Fun) {
+            self.function_declaration(FuncType::Function)
+        } else if self.match_consume(TokenType::Var) {
             self.var_declaration()
         } else {
             self.statement()
         }
+    }
+    fn function_declaration(&mut self, f_type: FuncType) -> Statement {
+        let name = self
+            .expect_token(TokenType::Identifier)
+            .expect(&format!("Expected {:?} name", f_type));
+        self.expect_token(TokenType::LeftParen)
+            .expect("Expected '('");
+
+        let mut params = vec![];
+        if !self.is_next(&[TokenType::RightParen]) {
+            loop {
+                if params.len() >= 255 {
+                    panic!("Cannot have more than 255 parameters");
+                }
+                params.push(
+                    self.expect_token(TokenType::Identifier)
+                        .expect("Expected an identifier"),
+                );
+                if !self.match_consume(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        self.expect_token(TokenType::RightParen)
+            .expect("Expected ')'");
+
+        self.expect_token(TokenType::LeftBrace)
+            .expect("Expected '{'");
+        let body = self.parse_block();
+
+        Statement::Function(Function { name, params, body })
     }
     fn var_declaration(&mut self) -> Statement {
         let iden = self
