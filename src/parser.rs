@@ -47,7 +47,7 @@ pub enum FuncType {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function {
+pub struct FuncDecl {
     pub name: Token,
     pub params: Vec<Token>,
     pub body: Vec<Statement>,
@@ -58,13 +58,13 @@ pub enum Statement {
     Print(Expression),
     Expression(Expression),
     VarDecl(Token, Option<Expression>),
-    Function(Function),
+    Function(FuncDecl),
     Block(Vec<Statement>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Expression {
     Binary {
         left: Box<Expression>,
@@ -88,8 +88,11 @@ pub enum Expression {
     Number(f64),
     String(String),
     Bool(bool),
+    #[default]
     Nil,
+    LoxFunction(LoxFunction),
 }
+use crate::interpreter::LoxFunction;
 use Expression as Expr;
 use TokenType as Type;
 
@@ -338,7 +341,7 @@ impl Parser {
             .expect("Expected '{'");
         let body = self.parse_block();
 
-        Statement::Function(Function { name, params, body })
+        Statement::Function(FuncDecl { name, params, body })
     }
     fn var_declaration(&mut self) -> Statement {
         let iden = self

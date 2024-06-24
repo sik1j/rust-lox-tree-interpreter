@@ -1,11 +1,37 @@
 use crate::environment::Environment;
-use crate::parser::Expression;
 use crate::parser::Statement;
+use crate::parser::{Expression, FuncDecl};
 use crate::scanner::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Interpreter {
     environment: Environment,
+}
+
+#[derive(Clone, Debug)]
+pub struct LoxFunction {
+    pub declaration: FuncDecl,
+}
+
+impl LoxFunction {
+    pub fn new(declaration: FuncDecl) -> Self {
+        LoxFunction { declaration }
+    }
+    pub fn call(&mut self, interpreter: &mut Interpreter, mut arguments: Vec<Expression>) {
+        let interpreter_env = std::mem::take(&mut interpreter.environment);
+        let mut environment = Environment::with_scope(Box::from(interpreter_env));
+
+        for (param, arg) in self.declaration.params.iter().zip(arguments.iter_mut()) {
+            environment.define(&param.lexeme, Some(std::mem::take(arg)))
+        }
+
+        interpreter
+            .execute_block(self.declaration.body.clone(), environment)
+            .expect("TODO: panic message");
+    }
+    pub fn arity(&self) -> usize {
+        self.declaration.params.len()
+    }
 }
 
 impl Interpreter {
@@ -41,12 +67,43 @@ impl Interpreter {
                 Ok(val)
             }
             Expression::Logical(lhs, op, rhs) => self.eval_logical(*lhs, op, *rhs),
+            Expression::Call {
+                callee,
+                arguments,
+                closing_paren,
+            } => self.eval_func_call(*callee, arguments, closing_paren),
             Expression::Number(_)
             | Expression::String(_)
             | Expression::Bool(_)
-            | Expression::Call { .. }
+            | Expression::LoxFunction(_)
             | Expression::Nil => Ok(expr),
         }
+    }
+    fn eval_func_call(
+        &mut self,
+        callee: Expression,
+        arguments: Vec<Expression>,
+        closing_paren: Token,
+    ) -> Result<Expression, String> {
+        let res = self.evaluate(callee)?;
+        let Expression::LoxFunction(mut function) = res else {
+            panic!("Cannot call {:?}", res);
+        };
+
+        let arity = function.arity();
+        let arg_len = arguments.len();
+
+        if arity != arg_len {
+            panic!("Expected {arity} arguments, received {arg_len}",)
+        }
+
+        let mut evald_args = vec![];
+        for argument in arguments {
+            evald_args.push(self.evaluate(argument)?);
+        }
+
+        function.call(self, evald_args);
+        Ok(Expression::Nil)
     }
 
     fn eval_binary(
@@ -159,7 +216,12 @@ impl Interpreter {
                     self.execute((*body).clone())?;
                 }
             }
-            Statement::Function(_) => {}
+            Statement::Function(decl) => {
+                let name = decl.name.lexeme.clone();
+                let function = LoxFunction::new(decl);
+                self.environment
+                    .define(&name, Some(Expression::LoxFunction(function)));
+            }
         };
         Ok(())
     }
