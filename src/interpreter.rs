@@ -18,8 +18,8 @@ impl LoxFunction {
         LoxFunction { declaration }
     }
     pub fn call(&mut self, interpreter: &mut Interpreter, mut arguments: Vec<Expression>) {
-        let interpreter_env = std::mem::take(&mut interpreter.environment);
-        let mut environment = Environment::with_scope(Box::from(interpreter_env));
+        let outer_env = std::mem::take(&mut interpreter.environment);
+        let mut environment = Environment::with_scope(Box::from(outer_env));
 
         for (param, arg) in self.declaration.params.iter().zip(arguments.iter_mut()) {
             environment.define(&param.lexeme, Some(std::mem::take(arg)))
@@ -103,7 +103,7 @@ impl Interpreter {
         }
 
         function.call(self, evald_args);
-        Ok(Expression::Nil)
+        Ok(std::mem::take(&mut self.environment.return_expr).unwrap_or_else(|| Expression::Nil))
     }
 
     fn eval_binary(
@@ -197,11 +197,8 @@ impl Interpreter {
                 self.environment.define(&tok.lexeme, val);
             }
             Statement::Block(statements) => {
-                let current_scope = std::mem::take(&mut self.environment);
-                self.execute_block(
-                    statements,
-                    Environment::with_scope(Box::from(current_scope)),
-                )?
+                let outer_env = std::mem::take(&mut self.environment);
+                self.execute_block(statements, Environment::with_scope(Box::from(outer_env)))?
             }
             Statement::If(expr, if_then, else_then) => {
                 let val = self.evaluate(expr)?;
@@ -222,6 +219,10 @@ impl Interpreter {
                 self.environment
                     .define(&name, Some(Expression::LoxFunction(function)));
             }
+            Statement::Return(expr) => {
+                let expr = self.evaluate(expr)?;
+                self.environment.return_expr = Some(expr);
+            }
         };
         Ok(())
     }
@@ -233,11 +234,16 @@ impl Interpreter {
         self.environment = environment;
 
         for statement in statements {
+            if self.environment.return_expr.is_some() {
+                break;
+            }
             self.execute(statement)?;
         }
 
-        let enclosing = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
-        self.environment = *enclosing;
+        let ret = std::mem::take(&mut self.environment.return_expr);
+        let outer_env = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
+        self.environment = *outer_env;
+        self.environment.return_expr = ret;
         Ok(())
     }
     fn eval_logical(

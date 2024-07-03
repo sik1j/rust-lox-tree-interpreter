@@ -25,10 +25,11 @@ use crate::scanner::{Token, TokenType};
 /// function     -> IDENTIFIER '(' parameters? ')' block ;
 /// arguments    -> IDENTIFIER ( ',' IDENTIFIER )* ;
 ///
-/// statement    -> exprStmt | ifStmt | printStmt | whileStmt | forStmt | block ;
+/// statement    -> exprStmt | ifStmt | printStmt | returnStmt | whileStmt | forStmt | block ;
 /// exprStmt     -> expression ';' ;
 /// ifStmt       -> "if" '(' expression ')' statement ( "else" statement )? ;
 /// printStmt    -> "print" expression ';' ;
+/// returnStmt   -> "return" expression? ';' ;
 /// whileStmt    -> "while" '(' expression ')' statement ;
 /// forStmt      -> "for" '('
 ///                 ( (varDecl | expressionStmt ) | ';' )
@@ -59,6 +60,7 @@ pub enum Statement {
     Expression(Expression),
     VarDecl(Token, Option<Expression>),
     Function(FuncDecl),
+    Return(Expression),
     Block(Vec<Statement>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
@@ -91,6 +93,7 @@ pub enum Expression {
     #[default]
     Nil,
     LoxFunction(LoxFunction),
+    // ReturnVal(Box<Expression>),
 }
 use crate::interpreter::LoxFunction;
 use Expression as Expr;
@@ -285,11 +288,12 @@ impl Parser {
             self.while_statement()
         } else if self.match_consume(TokenType::For) {
             self.for_statement()
+        } else if self.match_consume(TokenType::Return) {
+            self.return_statement()
         } else {
             self.expression_statement()
         }
     }
-
     fn print_statement(&mut self) -> Statement {
         let expr = self.expression();
         self.expect_token(TokenType::Semicolon)
@@ -302,6 +306,15 @@ impl Parser {
         self.expect_token(TokenType::Semicolon)
             .expect("Expected a ';'");
         Statement::Expression(expr)
+    }
+    fn return_statement(&mut self) -> Statement {
+        let mut ret = Expression::Nil;
+        if !self.is_next(&[TokenType::Semicolon]) {
+            ret = self.expression();
+        }
+        self.expect_token(TokenType::Semicolon)
+            .expect("Expected a ';'");
+        Statement::Return(ret)
     }
     fn declaration(&mut self) -> Statement {
         if self.match_consume(TokenType::Fun) {

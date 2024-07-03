@@ -4,6 +4,7 @@ use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct Environment {
     pub enclosing_environment: Option<Box<Environment>>,
+    pub return_expr: Option<Expression>,
     values: HashMap<String, Expression>,
 }
 
@@ -11,6 +12,7 @@ impl Environment {
     pub fn without_scope() -> Self {
         Environment {
             enclosing_environment: None,
+            return_expr: None,
             values: HashMap::new(),
         }
     }
@@ -18,6 +20,7 @@ impl Environment {
     pub fn with_scope(enclosing_scope: Box<Environment>) -> Environment {
         Environment {
             enclosing_environment: Some(enclosing_scope),
+            return_expr: None,
             values: HashMap::new(),
         }
     }
