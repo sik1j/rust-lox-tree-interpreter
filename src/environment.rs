@@ -46,9 +46,9 @@ impl Environment {
         Ok(())
     }
 
-    pub fn get(&self, name: &str) -> Expression {
+    pub fn get(&self, name: &str) -> &Expression {
         match (self.values.get(name), &self.enclosing_environment) {
-            (Some(val), _) => (*val).clone(),
+            (Some(val), _) => val,
             (None, None) => panic!("var '{}' not defined", name),
             (None, Some(enclosing_env)) => enclosing_env.get(name),
         }

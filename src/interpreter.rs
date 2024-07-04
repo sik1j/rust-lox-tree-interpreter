@@ -26,7 +26,7 @@ impl LoxFunction {
         }
 
         interpreter
-            .execute_block(self.declaration.body.clone(), environment)
+            .execute_block(&self.declaration.body, environment)
             .expect("TODO: panic message");
     }
     pub fn arity(&self) -> usize {
@@ -43,47 +43,47 @@ impl Interpreter {
 
     pub fn interpret(&mut self, statements: Vec<Statement>) {
         for statement in statements {
-            if let Err(msg) = self.execute(statement) {
+            if let Err(msg) = self.execute(&statement) {
                 println!("{}", msg);
             }
         }
     }
-    fn evaluate(&mut self, expr: Expression) -> Result<Expression, String> {
+    fn evaluate(&mut self, expr: &Expression) -> Result<Expression, String> {
         match expr {
             Expression::Binary {
                 left,
                 operator,
                 right,
-            } => self.eval_binary(*left, operator, *right),
-            Expression::Unary { operator, operand } => self.eval_unary(operator, *operand),
-            Expression::Grouping(expr) => self.evaluate(*expr),
+            } => self.eval_binary(left, operator, right),
+            Expression::Unary { operator, operand } => self.eval_unary(operator, operand),
+            Expression::Grouping(expr) => self.evaluate(expr),
             Expression::Variable(var_tok) => {
                 let val = self.environment.get(&var_tok.lexeme);
-                Ok(val)
+                Ok(val.clone())
             }
             Expression::Assign(tok, rhs) => {
-                let val = self.evaluate(*rhs)?;
+                let val = self.evaluate(rhs)?;
                 self.environment.assign(&tok.lexeme, val.clone())?;
                 Ok(val)
             }
-            Expression::Logical(lhs, op, rhs) => self.eval_logical(*lhs, op, *rhs),
+            Expression::Logical(lhs, op, rhs) => self.eval_logical(lhs, op, rhs),
             Expression::Call {
                 callee,
                 arguments,
                 closing_paren,
-            } => self.eval_func_call(*callee, arguments, closing_paren),
+            } => self.eval_func_call(callee, arguments, closing_paren),
             Expression::Number(_)
             | Expression::String(_)
             | Expression::Bool(_)
             | Expression::LoxFunction(_)
-            | Expression::Nil => Ok(expr),
+            | Expression::Nil => Ok(expr.clone()),
         }
     }
     fn eval_func_call(
         &mut self,
-        callee: Expression,
-        arguments: Vec<Expression>,
-        closing_paren: Token,
+        callee: &Expression,
+        arguments: &Vec<Expression>,
+        closing_paren: &Token,
     ) -> Result<Expression, String> {
         let res = self.evaluate(callee)?;
         let Expression::LoxFunction(mut function) = res else {
@@ -99,7 +99,7 @@ impl Interpreter {
 
         let mut evald_args = vec![];
         for argument in arguments {
-            evald_args.push(self.evaluate(argument)?);
+            evald_args.push(self.evaluate(&argument)?);
         }
 
         function.call(self, evald_args);
@@ -108,9 +108,9 @@ impl Interpreter {
 
     fn eval_binary(
         &mut self,
-        lhs: Expression,
-        op: Token,
-        rhs: Expression,
+        lhs: &Expression,
+        op: &Token,
+        rhs: &Expression,
     ) -> Result<Expression, String> {
         let lhs = self.evaluate(lhs)?;
         let rhs = self.evaluate(rhs)?;
@@ -146,7 +146,7 @@ impl Interpreter {
         })
     }
 
-    fn eval_unary(&mut self, operator: Token, operand: Expression) -> Result<Expression, String> {
+    fn eval_unary(&mut self, operator: &Token, operand: &Expression) -> Result<Expression, String> {
         let rhs = self.evaluate(operand)?;
 
         Ok(match operator.token_type {
@@ -177,19 +177,19 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, statement: Statement) -> Result<(), String> {
+    fn execute(&mut self, statement: &Statement) -> Result<(), String> {
         match statement {
             Statement::Print(expr) => {
-                let val = self.evaluate(expr)?;
+                let val = self.evaluate(&expr)?;
                 println!("{:?}", val);
             }
             Statement::Expression(expr) => {
-                self.evaluate(expr)?;
+                self.evaluate(&expr)?;
             }
             Statement::VarDecl(tok, init) => {
                 let val;
                 if let Some(expr) = init {
-                    val = Some(self.evaluate(expr)?);
+                    val = Some(self.evaluate(&expr)?);
                 } else {
                     val = None;
                 }
@@ -201,26 +201,26 @@ impl Interpreter {
                 self.execute_block(statements, Environment::with_scope(Box::from(outer_env)))?
             }
             Statement::If(expr, if_then, else_then) => {
-                let val = self.evaluate(expr)?;
+                let val = self.evaluate(&expr)?;
                 if Self::is_truthy(&val) {
-                    self.execute(*if_then)?;
+                    self.execute(if_then)?;
                 } else if let Some(branch) = else_then {
-                    self.execute(*branch)?;
+                    self.execute(branch)?;
                 };
             }
             Statement::While(condition, body) => {
-                while Self::is_truthy(&self.evaluate(condition.clone())?) {
-                    self.execute((*body).clone())?;
+                while Self::is_truthy(&self.evaluate(&condition)?) {
+                    self.execute(body)?;
                 }
             }
             Statement::Function(decl) => {
                 let name = decl.name.lexeme.clone();
-                let function = LoxFunction::new(decl);
+                let function = LoxFunction::new(decl.clone());
                 self.environment
                     .define(&name, Some(Expression::LoxFunction(function)));
             }
             Statement::Return(expr) => {
-                let expr = self.evaluate(expr)?;
+                let expr = self.evaluate(&expr)?;
                 self.environment.return_expr = Some(expr);
             }
         };
@@ -228,7 +228,7 @@ impl Interpreter {
     }
     pub fn execute_block(
         &mut self,
-        statements: Vec<Statement>,
+        statements: &Vec<Statement>,
         environment: Environment,
     ) -> Result<(), String> {
         self.environment = environment;
@@ -248,13 +248,13 @@ impl Interpreter {
     }
     fn eval_logical(
         &mut self,
-        lhs: Expression,
-        op: Token,
-        rhs: Expression,
+        lhs: &Expression,
+        op: &Token,
+        rhs: &Expression,
     ) -> Result<Expression, String> {
         let lhs_val = self.evaluate(lhs)?;
 
-        match (op.token_type, Self::is_truthy(&lhs_val)) {
+        match (&op.token_type, Self::is_truthy(&lhs_val)) {
             (TokenType::Or, true) | (TokenType::And, false) => Ok(lhs_val),
             (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(rhs),
             (other, _) => panic!("Unexpected token {:?}", other),
