@@ -2,27 +2,35 @@ use crate::environment::Environment;
 use crate::parser::Statement;
 use crate::parser::{Expression, FuncDecl};
 use crate::scanner::{Token, TokenType};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Interpreter {
-    environment: Environment,
+    environment: Rc<RefCell<Environment>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct LoxFunction {
     pub declaration: FuncDecl,
+    pub closure: Rc<RefCell<Environment>>,
 }
 
 impl LoxFunction {
-    pub fn new(declaration: FuncDecl) -> Self {
-        LoxFunction { declaration }
+    pub fn new(declaration: FuncDecl, closure: Rc<RefCell<Environment>>) -> Self {
+        LoxFunction {
+            declaration,
+            closure,
+        }
     }
     pub fn call(&mut self, interpreter: &mut Interpreter, mut arguments: Vec<Expression>) {
-        let outer_env = std::mem::take(&mut interpreter.environment);
-        let mut environment = Environment::with_scope(Box::from(outer_env));
+        let outer_env = self.closure.clone();
+        let mut environment = Rc::new(RefCell::new(Environment::with_scope(outer_env)));
 
         for (param, arg) in self.declaration.params.iter().zip(arguments.iter_mut()) {
-            environment.define(&param.lexeme, Some(std::mem::take(arg)))
+            environment
+                .borrow_mut()
+                .define(&param.lexeme, Some(std::mem::take(arg)))
         }
 
         interpreter
@@ -37,7 +45,7 @@ impl LoxFunction {
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            environment: Environment::without_scope(),
+            environment: Rc::new(RefCell::new(Environment::without_scope())),
         }
     }
 
@@ -58,12 +66,14 @@ impl Interpreter {
             Expression::Unary { operator, operand } => self.eval_unary(operator, operand),
             Expression::Grouping(expr) => self.evaluate(expr),
             Expression::Variable(var_tok) => {
-                let val = self.environment.get(&var_tok.lexeme);
+                let val = self.environment.borrow().get(&var_tok.lexeme);
                 Ok(val.clone())
             }
             Expression::Assign(tok, rhs) => {
                 let val = self.evaluate(rhs)?;
-                self.environment.assign(&tok.lexeme, val.clone())?;
+                self.environment
+                    .borrow_mut()
+                    .assign(&tok.lexeme, val.clone())?;
                 Ok(val)
             }
             Expression::Logical(lhs, op, rhs) => self.eval_logical(lhs, op, rhs),
@@ -103,7 +113,10 @@ impl Interpreter {
         }
 
         function.call(self, evald_args);
-        Ok(std::mem::take(&mut self.environment.return_expr).unwrap_or_else(|| Expression::Nil))
+        Ok(
+            std::mem::take(&mut self.environment.borrow_mut().return_expr)
+                .unwrap_or_else(|| Expression::Nil),
+        )
     }
 
     fn eval_binary(
@@ -194,11 +207,12 @@ impl Interpreter {
                     val = None;
                 }
 
-                self.environment.define(&tok.lexeme, val);
+                self.environment.borrow_mut().define(&tok.lexeme, val);
             }
             Statement::Block(statements) => {
-                let outer_env = std::mem::take(&mut self.environment);
-                self.execute_block(statements, Environment::with_scope(Box::from(outer_env)))?
+                let outer_env = self.environment.clone();
+                let block_env = Rc::new(RefCell::new(Environment::with_scope(outer_env)));
+                self.execute_block(statements, block_env)?
             }
             Statement::If(expr, if_then, else_then) => {
                 let val = self.evaluate(&expr)?;
@@ -215,13 +229,14 @@ impl Interpreter {
             }
             Statement::Function(decl) => {
                 let name = decl.name.lexeme.clone();
-                let function = LoxFunction::new(decl.clone());
+                let function = LoxFunction::new(decl.clone(), self.environment.clone());
                 self.environment
+                    .borrow_mut()
                     .define(&name, Some(Expression::LoxFunction(function)));
             }
             Statement::Return(expr) => {
                 let expr = self.evaluate(&expr)?;
-                self.environment.return_expr = Some(expr);
+                self.environment.borrow_mut().return_expr = Some(expr);
             }
         };
         Ok(())
@@ -229,21 +244,22 @@ impl Interpreter {
     pub fn execute_block(
         &mut self,
         statements: &Vec<Statement>,
-        environment: Environment,
+        environment: Rc<RefCell<Environment>>,
     ) -> Result<(), String> {
+        let previous_env = self.environment.clone();
+
         self.environment = environment;
 
         for statement in statements {
-            if self.environment.return_expr.is_some() {
+            if self.environment.borrow().return_expr.is_some() {
                 break;
             }
             self.execute(statement)?;
         }
 
-        let ret = std::mem::take(&mut self.environment.return_expr);
-        let outer_env = std::mem::take(&mut self.environment.enclosing_environment).unwrap();
-        self.environment = *outer_env;
-        self.environment.return_expr = ret;
+        let ret = std::mem::take(&mut self.environment.borrow_mut().return_expr);
+        self.environment = previous_env;
+        self.environment.borrow_mut().return_expr = ret;
         Ok(())
     }
     fn eval_logical(
