@@ -2,6 +2,7 @@ mod driver;
 mod environment;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 
 use driver::Driver;

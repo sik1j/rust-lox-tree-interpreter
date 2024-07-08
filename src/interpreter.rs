@@ -3,6 +3,7 @@ use crate::parser::Statement;
 use crate::parser::{Expression, FuncDecl};
 use crate::scanner::{Token, TokenType};
 use std::cell::RefCell;
+use std::process::id;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -69,14 +70,21 @@ impl Interpreter {
                 let val = self.environment.borrow().get(&var_tok.lexeme);
                 Ok(val.clone())
             }
-            Expression::Assign(tok, rhs) => {
-                let val = self.evaluate(rhs)?;
+            Expression::Assign {
+                identifier,
+                expression,
+            } => {
+                let val = self.evaluate(expression)?;
                 self.environment
                     .borrow_mut()
-                    .assign(&tok.lexeme, val.clone())?;
+                    .assign(&identifier.lexeme, val.clone())?;
                 Ok(val)
             }
-            Expression::Logical(lhs, op, rhs) => self.eval_logical(lhs, op, rhs),
+            Expression::Logical {
+                left,
+                operator,
+                right,
+            } => self.eval_logical(left, operator, right),
             Expression::Call {
                 callee,
                 arguments,
@@ -199,30 +207,39 @@ impl Interpreter {
             Statement::Expression(expr) => {
                 self.evaluate(&expr)?;
             }
-            Statement::VarDecl(tok, init) => {
+            Statement::VarDecl {
+                identifier,
+                initializer,
+            } => {
                 let val;
-                if let Some(expr) = init {
+                if let Some(expr) = initializer {
                     val = Some(self.evaluate(&expr)?);
                 } else {
                     val = None;
                 }
 
-                self.environment.borrow_mut().define(&tok.lexeme, val);
+                self.environment
+                    .borrow_mut()
+                    .define(&identifier.lexeme, val);
             }
             Statement::Block(statements) => {
                 let outer_env = self.environment.clone();
                 let block_env = Rc::new(RefCell::new(Environment::with_scope(outer_env)));
                 self.execute_block(statements, block_env)?
             }
-            Statement::If(expr, if_then, else_then) => {
-                let val = self.evaluate(&expr)?;
+            Statement::If {
+                condition,
+                if_body,
+                else_body,
+            } => {
+                let val = self.evaluate(&condition)?;
                 if Self::is_truthy(&val) {
-                    self.execute(if_then)?;
-                } else if let Some(branch) = else_then {
+                    self.execute(if_body)?;
+                } else if let Some(branch) = else_body {
                     self.execute(branch)?;
                 };
             }
-            Statement::While(condition, body) => {
+            Statement::While { condition, body } => {
                 while Self::is_truthy(&self.evaluate(&condition)?) {
                     self.execute(body)?;
                 }

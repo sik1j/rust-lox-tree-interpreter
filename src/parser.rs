@@ -58,12 +58,22 @@ pub struct FuncDecl {
 pub enum Statement {
     Print(Expression),
     Expression(Expression),
-    VarDecl(Token, Option<Expression>),
+    VarDecl {
+        identifier: Token,
+        initializer: Option<Expression>,
+    },
     Function(FuncDecl),
     Return(Expression),
     Block(Vec<Statement>),
-    If(Expression, Box<Statement>, Option<Box<Statement>>),
-    While(Expression, Box<Statement>),
+    If {
+        condition: Expression,
+        if_body: Box<Statement>,
+        else_body: Option<Box<Statement>>,
+    },
+    While {
+        condition: Expression,
+        body: Box<Statement>,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -78,9 +88,16 @@ pub enum Expression {
         operand: Box<Expression>,
     },
     Grouping(Box<Expression>),
-    Assign(Token, Box<Expression>),
+    Assign {
+        identifier: Token,
+        expression: Box<Expression>,
+    },
     Variable(Token),
-    Logical(Box<Expression>, Token, Box<Expression>),
+    Logical {
+        left: Box<Expression>,
+        operator: Token,
+        right: Box<Expression>,
+    },
     Call {
         callee: Box<Expression>,
         arguments: Vec<Expression>,
@@ -93,7 +110,6 @@ pub enum Expression {
     #[default]
     Nil,
     LoxFunction(LoxFunction),
-    // ReturnVal(Box<Expression>),
 }
 use crate::interpreter::LoxFunction;
 use Expression as Expr;
@@ -357,27 +373,33 @@ impl Parser {
         Statement::Function(FuncDecl { name, params, body })
     }
     fn var_declaration(&mut self) -> Statement {
-        let iden = self
+        let identifier = self
             .expect_token(TokenType::Identifier)
             .expect("Expected an identifier");
 
-        let mut initalizer = None;
+        let mut initializer = None;
         if self.match_consume(TokenType::Equal) {
-            initalizer = Some(self.expression());
+            initializer = Some(self.expression());
         }
 
         self.expect_token(TokenType::Semicolon)
             .expect("Expected a ';'");
-        Statement::VarDecl(iden, initalizer)
+        Statement::VarDecl {
+            identifier,
+            initializer,
+        }
     }
     fn assignment(&mut self) -> Expression {
         let expr = self.or();
 
         if self.is_next(&[TokenType::Equal]) {
-            if let Expression::Variable(tok) = expr {
+            if let Expression::Variable(identifier) = expr {
                 self.consume_token();
                 let val = self.assignment();
-                return Expression::Assign(tok, Box::from(val));
+                return Expression::Assign {
+                    identifier,
+                    expression: val.into(),
+                };
             }
             panic!("Invalid assignment target");
         }
@@ -407,21 +429,29 @@ impl Parser {
         self.expect_token(TokenType::RightParen)
             .expect("Expected a closing ')'");
 
-        let if_branch = self.statement();
-        let mut else_branch = None;
+        let if_body = self.statement().into();
+        let mut else_body = None;
         if self.match_consume(TokenType::Else) {
-            else_branch = Some(Box::from(self.statement()));
+            else_body = Some(self.statement().into());
         }
-        Statement::If(condition, Box::from(if_branch), else_branch)
+        Statement::If {
+            condition,
+            if_body,
+            else_body,
+        }
     }
 
     fn or(&mut self) -> Expr {
         let mut lhs = self.and();
 
         while self.is_next(&[TokenType::Or]) {
-            let op = self.consume_token();
+            let operator = self.consume_token();
             let rhs = self.and();
-            lhs = Expression::Logical(Box::from(lhs), op, Box::from(rhs));
+            lhs = Expression::Logical {
+                left: lhs.into(),
+                operator,
+                right: rhs.into(),
+            }
         }
 
         lhs
@@ -431,9 +461,13 @@ impl Parser {
         let mut lhs = self.equality();
 
         while self.is_next(&[TokenType::And]) {
-            let op = self.consume_token();
+            let operator = self.consume_token();
             let rhs = self.equality();
-            lhs = Expression::Logical(Box::from(lhs), op, Box::from(rhs));
+            lhs = Expression::Logical {
+                left: lhs.into(),
+                operator,
+                right: rhs.into(),
+            }
         }
 
         lhs
@@ -446,9 +480,9 @@ impl Parser {
         self.expect_token(TokenType::RightParen)
             .expect("Expected a closing  ')'");
 
-        let body = self.statement();
+        let body = self.statement().into();
 
-        Statement::While(condition, Box::from(body))
+        Statement::While { condition, body }
     }
 
     fn for_statement(&mut self) -> Statement {
@@ -478,21 +512,19 @@ impl Parser {
         self.expect_token(TokenType::RightParen)
             .expect("Expected a ')'");
 
-        // Statement::Block(vec![initalizer.unwrap(), self.statement()])
-
         let mut body = self.statement();
         if let Some(effect) = side_effect {
             body = Statement::Block(vec![body, Statement::Expression(effect)]);
         }
 
-        let while_version = Statement::While(
-            condition.unwrap_or_else(|| Expression::Bool(true)),
-            Box::from(body),
-        );
+        let while_block = Statement::While {
+            condition: condition.unwrap_or(Expression::Bool(true)),
+            body: Box::from(body),
+        };
 
         Statement::Block(match initalizer {
-            None => vec![while_version],
-            Some(init) => vec![init, while_version],
+            None => vec![while_block],
+            Some(init) => vec![init, while_block],
         })
     }
 }
