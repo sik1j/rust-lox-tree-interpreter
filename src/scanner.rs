@@ -8,7 +8,7 @@ pub struct Error {
     pub wher: String,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -46,6 +46,7 @@ pub enum TokenType {
     Fun,
     For,
     If,
+    #[default]
     Nil,
     Or,
     Print,
@@ -59,7 +60,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,

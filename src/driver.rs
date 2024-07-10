@@ -1,8 +1,10 @@
-use crate::interpreter::Interpreter;
-use crate::parser::{Expression, Parser};
-use crate::scanner::Scanner;
 use std::io::{BufRead, Write};
 use std::{env, fs};
+
+use crate::interpreter::Interpreter;
+use crate::parser::Parser;
+use crate::resolver::Resolver;
+use crate::scanner::Scanner;
 
 pub struct Driver {
     interpreter: Interpreter,
@@ -62,9 +64,15 @@ impl Driver {
         parser = Parser::new(tokens);
         let statements = parser.parse();
 
-        for statement in &statements {
-            println!("{:?}", statement);
-        }
+        // println!("\n============== Parsing: ===============\n");
+        // for statement in &statements {
+        //     println!("{:?}", statement);
+        // }
+
+        println!("\n============== Resolving: ===============\n");
+        let mut resolver = Resolver::new(std::mem::take(&mut self.interpreter));
+        resolver.resolve(&statements);
+        self.interpreter = std::mem::take(&mut resolver.interpreter);
 
         println!("\n============== Interpreting below: ===============\n");
 

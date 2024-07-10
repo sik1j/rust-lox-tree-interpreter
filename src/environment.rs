@@ -1,7 +1,8 @@
-use crate::parser::Expression;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+use crate::parser::Expression;
 
 #[derive(Debug, Default)]
 pub struct Environment {
@@ -31,28 +32,58 @@ impl Environment {
         let val = value.unwrap_or(Expression::Nil);
         self.values.insert(name.to_string(), val);
     }
-
-    pub fn assign(&mut self, name: &str, value: Expression) -> Result<(), String> {
-        match (
-            self.values.contains_key(name),
-            &mut self.enclosing_environment,
-        ) {
-            (true, _) => {
-                self.values.insert(name.to_string(), value);
-            }
-            (false, Some(enclosing_env)) => {
-                enclosing_env.borrow_mut().assign(name, value)?;
-            }
-            (false, None) => return Err(format!("Undefined variable: {name}")),
-        };
-        Ok(())
+    fn assign(&mut self, name: &str, value: Expression) {
+        self.values.insert(name.to_string(), value);
+    }
+    pub fn assign_at(&mut self, distance: &usize, name: &str, val: Expression) {
+        if *distance == 0 {
+            return self.assign(name, val);
+        }
+        return self
+            .enclosing_environment
+            .clone()
+            .unwrap()
+            .borrow_mut()
+            .assign_at(&(distance - 1), name, val);
+    }
+    pub fn assign_global(&mut self, name: &str, val: Expression) {
+        if let None = self.enclosing_environment {
+            return self.assign(name, val);
+        }
+        return self
+            .enclosing_environment
+            .clone()
+            .unwrap()
+            .borrow_mut()
+            .assign_global(name, val);
+    }
+    fn get(&self, name: &str) -> Expression {
+        self.values
+            .get(name)
+            .expect(&format!("Variable {name} not defined"))
+            .clone()
+    }
+    pub fn get_at(&self, distance: &usize, name: &str) -> Expression {
+        if *distance == 0 {
+            return self.get(name);
+        }
+        return self
+            .enclosing_environment
+            .clone()
+            .unwrap()
+            .borrow()
+            .get_at(&(distance - 1), name);
     }
 
-    pub fn get(&self, name: &str) -> Expression {
-        match (self.values.get(name), &self.enclosing_environment) {
-            (Some(val), _) => (*val).clone(),
-            (None, None) => panic!("var '{}' not defined", name),
-            (None, Some(enclosing_env)) => enclosing_env.borrow().get(name),
+    pub fn get_global(&self, name: &str) -> Expression {
+        if let None = self.enclosing_environment {
+            return self.get(name);
         }
+        return self
+            .enclosing_environment
+            .clone()
+            .unwrap()
+            .borrow()
+            .get_global(name);
     }
 }

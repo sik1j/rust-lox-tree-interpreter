@@ -76,6 +76,31 @@ pub enum Statement {
     },
 }
 
+pub struct VariableGenerator {
+    next_id: u64,
+}
+
+impl VariableGenerator {
+    pub fn new() -> Self {
+        Self { next_id: 0 }
+    }
+
+    pub fn new_variable(&mut self, identifier: Token) -> Variable {
+        self.next_id += 1;
+        Variable {
+            id: self.next_id - 1,
+            identifier,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct Variable {
+    pub identifier: Token,
+    pub id: u64,
+}
+
 #[derive(Debug, Clone, Default)]
 pub enum Expression {
     Binary {
@@ -88,11 +113,11 @@ pub enum Expression {
         operand: Box<Expression>,
     },
     Grouping(Box<Expression>),
-    Assign {
-        identifier: Token,
-        expression: Box<Expression>,
+    Assignment {
+        var: Variable,
+        value: Box<Expression>,
     },
-    Variable(Token),
+    Variable(Variable),
     Logical {
         left: Box<Expression>,
         operator: Token,
@@ -118,6 +143,7 @@ use TokenType as Type;
 pub(crate) struct Parser {
     tokens: Vec<Token>, // stored in reversed order so popping is more efficient
     position: usize,
+    gen: VariableGenerator,
 }
 
 impl Parser {
@@ -126,6 +152,7 @@ impl Parser {
         Self {
             tokens,
             position: 0,
+            gen: VariableGenerator::new(),
         }
     }
 
@@ -288,7 +315,7 @@ impl Parser {
                     .expect("Expected a closing ')'");
                 Expr::Grouping(Box::from(expr))
             }
-            Type::Identifier => Expr::Variable(tok),
+            Type::Identifier => Expr::Variable(self.gen.new_variable(tok)),
             _ => panic!("Unexpected token: {:?}", tok),
         }
     }
@@ -393,12 +420,12 @@ impl Parser {
         let expr = self.or();
 
         if self.is_next(&[TokenType::Equal]) {
-            if let Expression::Variable(identifier) = expr {
+            if let Expression::Variable(var) = expr {
                 self.consume_token();
                 let val = self.assignment();
-                return Expression::Assign {
-                    identifier,
-                    expression: val.into(),
+                return Expression::Assignment {
+                    var: var.clone(),
+                    value: val.into(),
                 };
             }
             panic!("Invalid assignment target");

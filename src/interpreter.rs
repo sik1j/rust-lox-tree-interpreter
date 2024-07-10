@@ -1,52 +1,49 @@
-use crate::environment::Environment;
-use crate::parser::Statement;
-use crate::parser::{Expression, FuncDecl};
-use crate::scanner::{Token, TokenType};
 use std::cell::RefCell;
-use std::process::id;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
+use crate::environment::Environment;
+use crate::parser::{Expression, FuncDecl};
+use crate::parser::{Statement, Variable};
+use crate::scanner::{Token, TokenType};
+
+#[derive(Debug, Default)]
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct LoxFunction {
-    pub declaration: FuncDecl,
-    pub closure: Rc<RefCell<Environment>>,
-}
-
-impl LoxFunction {
-    pub fn new(declaration: FuncDecl, closure: Rc<RefCell<Environment>>) -> Self {
-        LoxFunction {
-            declaration,
-            closure,
-        }
-    }
-    pub fn call(&mut self, interpreter: &mut Interpreter, mut arguments: Vec<Expression>) {
-        let outer_env = self.closure.clone();
-        let mut environment = Rc::new(RefCell::new(Environment::with_scope(outer_env)));
-
-        for (param, arg) in self.declaration.params.iter().zip(arguments.iter_mut()) {
-            environment
-                .borrow_mut()
-                .define(&param.lexeme, Some(std::mem::take(arg)))
-        }
-
-        interpreter
-            .execute_block(&self.declaration.body, environment)
-            .expect("TODO: panic message");
-    }
-    pub fn arity(&self) -> usize {
-        self.declaration.params.len()
-    }
+    locals_vars: HashMap<u64, usize>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             environment: Rc::new(RefCell::new(Environment::without_scope())),
+            locals_vars: HashMap::new(),
+        }
+    }
+    pub fn resolve(&mut self, var_id: u64, scope_distance: usize) {
+        println!("putting in: {var_id} at {scope_distance}");
+        self.locals_vars.insert(var_id, scope_distance);
+    }
+    fn look_up_var(&self, var: &Variable) -> Expression {
+        match self.locals_vars.get(&var.id) {
+            Some(distance) => self
+                .environment
+                .borrow()
+                .get_at(distance, &var.identifier.lexeme),
+            None => self.environment.borrow().get_global(&var.identifier.lexeme),
+        }
+    }
+    fn assign_var(&mut self, var: &Variable, val: Expression) {
+        match self.locals_vars.get(&var.id) {
+            None => self
+                .environment
+                .borrow_mut()
+                .assign_global(&var.identifier.lexeme, val),
+            Some(distance) => {
+                self.environment
+                    .borrow_mut()
+                    .assign_at(distance, &var.identifier.lexeme, val)
+            }
         }
     }
 
@@ -66,18 +63,16 @@ impl Interpreter {
             } => self.eval_binary(left, operator, right),
             Expression::Unary { operator, operand } => self.eval_unary(operator, operand),
             Expression::Grouping(expr) => self.evaluate(expr),
-            Expression::Variable(var_tok) => {
-                let val = self.environment.borrow().get(&var_tok.lexeme);
+            Expression::Variable(var) => {
+                let val = self.look_up_var(var);
                 Ok(val.clone())
             }
-            Expression::Assign {
-                identifier,
-                expression,
+            Expression::Assignment {
+                var,
+                value: expression,
             } => {
                 let val = self.evaluate(expression)?;
-                self.environment
-                    .borrow_mut()
-                    .assign(&identifier.lexeme, val.clone())?;
+                self.assign_var(var, val.clone());
                 Ok(val)
             }
             Expression::Logical {
@@ -292,5 +287,36 @@ impl Interpreter {
             (TokenType::Or, false) | (TokenType::And, true) => self.evaluate(rhs),
             (other, _) => panic!("Unexpected token {:?}", other),
         }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct LoxFunction {
+    pub declaration: FuncDecl,
+    pub closure: Rc<RefCell<Environment>>,
+}
+
+impl LoxFunction {
+    pub fn new(declaration: FuncDecl, closure: Rc<RefCell<Environment>>) -> Self {
+        LoxFunction {
+            declaration,
+            closure,
+        }
+    }
+    pub fn call(&mut self, interpreter: &mut Interpreter, mut arguments: Vec<Expression>) {
+        let outer_env = self.closure.clone();
+        let mut environment = Rc::new(RefCell::new(Environment::with_scope(outer_env)));
+
+        for (param, arg) in self.declaration.params.iter().zip(arguments.iter_mut()) {
+            environment
+                .borrow_mut()
+                .define(&param.lexeme, Some(std::mem::take(arg)))
+        }
+
+        interpreter
+            .execute_block(&self.declaration.body, environment)
+            .expect("TODO: panic message");
+    }
+    pub fn arity(&self) -> usize {
+        self.declaration.params.len()
     }
 }
